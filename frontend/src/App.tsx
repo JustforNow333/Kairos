@@ -3,7 +3,7 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { fetchDashboard, uploadSyllabus } from "./api";
-import type { DashboardResponse, ParseResponse, ScheduleBlock } from "./types";
+import type { DashboardResponse, ParseResponse, ScheduleBlock, SocialPocket } from "./types";
 
 function formatTime(value: string): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -44,6 +44,58 @@ function blockTone(type: ScheduleBlock["block_type"]): string {
   }
 }
 
+function buildFateweaverStrategies(
+  dashboard: DashboardResponse,
+  targetPocket: SocialPocket | null,
+): string[] {
+  const targetLabel = targetPocket?.title ?? "this window";
+  const strategies: string[] = [];
+  const sprintMinutes = Math.min(Math.max(Math.round(dashboard.shuffle_plan.unlocked_minutes / 2), 20), 30);
+
+  const readingAssignment = dashboard.assignments.find(
+    (assignment) => assignment.status !== "done" && assignment.task_type === "reading",
+  );
+  if (readingAssignment) {
+    strategies.push(
+      `Do ${readingAssignment.title} in focused skim mode and extract only discussion-critical points. That keeps ${targetLabel} reachable.`,
+    );
+  }
+
+  const problemSetAssignment = dashboard.assignments.find(
+    (assignment) =>
+      assignment.status !== "done" &&
+      (assignment.task_type === "pset" || assignment.task_type === "lab"),
+  );
+  if (problemSetAssignment) {
+    strategies.push(
+      `Start ${problemSetAssignment.title} with the fastest wins first so you secure visible progress before you leave.`,
+    );
+  }
+
+  const laterWorkBlock = dashboard.shuffle_plan.after_blocks.find(
+    (block) => block.block_type === "work" && new Date(block.start_at).getHours() >= 19,
+  );
+  if (laterWorkBlock) {
+    strategies.push(
+      `Move ${laterWorkBlock.label} into the quieter later block and protect the next clean sprint for ${targetLabel}.`,
+    );
+  }
+
+  if (strategies.length < 3) {
+    strategies.push(
+      `Use a ${sprintMinutes}-minute distraction-free sprint now. Fateweaver Protocol only needs one clean burst to unlock ${targetLabel}.`,
+    );
+  }
+
+  if (strategies.length < 3) {
+    strategies.push(
+      `Aim for a good-enough pass before this window, then revise later tonight once the opportunity is secured.`,
+    );
+  }
+
+  return strategies.slice(0, 3);
+}
+
 function ScheduleCanvas({
   blocks,
   title,
@@ -55,7 +107,7 @@ function ScheduleCanvas({
     <div className="schedule-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Dynamic Shuffle</p>
+          <p className="eyebrow">Fateweaver Protocol</p>
           <h3>{title}</h3>
         </div>
         <p className="muted">8 AM to 10 PM</p>
@@ -100,7 +152,7 @@ const storyLabels = [
   "Ingest syllabus",
   "Price the work debt",
   "Spot a social window",
-  "Run Dynamic Shuffle",
+  "Run Fateweaver Protocol",
 ];
 
 export default function App() {
@@ -147,6 +199,13 @@ export default function App() {
   }, [dashboard, showShuffled]);
 
   const topPocket = dashboard?.pockets[0] ?? null;
+  const fateweaverStrategies = useMemo(() => {
+    if (!dashboard) {
+      return [];
+    }
+
+    return buildFateweaverStrategies(dashboard, topPocket);
+  }, [dashboard, topPocket]);
 
   function playDemoStory() {
     setStoryStep(0);
@@ -210,16 +269,17 @@ export default function App() {
         transition={{ duration: 0.65 }}
       >
         <div className="hero-copy">
-          <p className="eyebrow">KAIROS / Cornell life optimization</p>
+          <p className="eyebrow">KAIROS / Cornell life arbitrage</p>
           <h1>Live the life you planned, not the one you fell into.</h1>
           <p className="hero-text">
-            KAIROS turns academic pressure, friend availability, and idle drift into a
-            single decision engine. It does not just track your day. It arbitrages it.
+            KAIROS turns academic pressure, friend availability, and idle drift into
+            Fateweaver Protocol: a system that rewrites flexible work around the moments
+            worth saving.
           </p>
 
           <div className="hero-actions">
             <button className="primary-button" onClick={() => setShowShuffled((value) => !value)}>
-              {showShuffled ? "Show current schedule" : "Trigger Dynamic Shuffle"}
+              {showShuffled ? "Show original day" : "Trigger Fateweaver Protocol"}
             </button>
             <button className="secondary-button" onClick={playDemoStory}>
               Play demo story
@@ -236,7 +296,7 @@ export default function App() {
               <strong>{dashboard.ledger.work_debt_score}</strong>
             </div>
             <div>
-              <span>Claimable window</span>
+              <span>Recovered window</span>
               <strong>{dashboard.shuffle_plan.unlocked_minutes} mins</strong>
             </div>
             <div>
@@ -257,7 +317,7 @@ export default function App() {
           transition={{ duration: 0.55, delay: 0.12 }}
         >
           <div className="hero-card-top">
-            <span className="badge">Trade-off engine</span>
+            <span className="badge">Fateweaver engine</span>
             <span>{dashboard.course.code}</span>
           </div>
           <h2>{topPocket?.title ?? dashboard.idle_alert.headline}</h2>
@@ -349,16 +409,33 @@ export default function App() {
           >
             <ScheduleCanvas
               blocks={scheduleBlocks}
-              title={showShuffled ? "Unlocked social window" : "Current day plan"}
+              title={showShuffled ? "Rewoven day" : "Original day plan"}
             />
             <div className="shuffle-footer">
               <div>
-                <p className="eyebrow">What KAIROS sees</p>
+                <p className="eyebrow">Rewritten tradeoff</p>
                 <h3>{dashboard.shuffle_plan.tradeoff_statement}</h3>
               </div>
               <button className="secondary-button" onClick={() => setShowShuffled((value) => !value)}>
-                {showShuffled ? "Reset day" : "Unlock this window"}
+                {showShuffled ? "Show original day" : "Run Fateweaver Protocol"}
               </button>
+            </div>
+            <div className="strategy-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">AI tactics</p>
+                  <h3>How Fateweaver makes this window believable</h3>
+                </div>
+                <span className="badge">Window-specific</span>
+              </div>
+              <div className="strategy-list">
+                {fateweaverStrategies.map((strategy) => (
+                  <div className="strategy-item" key={strategy}>
+                    <span className="strategy-index">Protocol</span>
+                    <p>{strategy}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </motion.article>
         </section>

@@ -452,6 +452,49 @@ body {
   margin-top: 18px;
 }
 
+.strategy-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid var(--line);
+}
+
+.strategy-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.strategy-item {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 250, 244, 0.88);
+  border: 1px solid rgba(74, 52, 39, 0.08);
+}
+
+.strategy-item p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.strategy-index {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(179, 27, 27, 0.08);
+  color: var(--brand);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .intervention-card {
   background:
     linear-gradient(160deg, rgba(255, 249, 241, 0.95), rgba(250, 238, 222, 0.88)),
