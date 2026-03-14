@@ -3,7 +3,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     USE_MOCK_DATA: bool = True
     OPENAI_API_KEY: str | None = None
-    # Future settings can be added here (e.g., GOOGLE_CALENDAR_CREDENTIALS)
+    NEXT_PUBLIC_APP_URL: str = "http://localhost:3000"
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

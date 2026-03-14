@@ -2,8 +2,8 @@
 
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import { fetchDashboard, uploadSyllabus } from "./api";
-import type { DashboardResponse, ParseResponse, ScheduleBlock, SocialPocket } from "./types";
+import { fetchDashboard, uploadSyllabus, putUserAssumptions, syncGoogleCalendar, getGoogleOAuthUrl, addFriend } from "./api";
+import type { DashboardResponse, ParseResponse, ScheduleBlock, SocialPocket, UserAssumptions } from "./types";
 
 function formatTime(value: string): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -160,9 +160,24 @@ export default function App() {
   const [parseResult, setParseResult] = useState<ParseResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [showShuffled, setShowShuffled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storyStep, setStoryStep] = useState(0);
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [assumptionsForm, setAssumptionsForm] = useState<UserAssumptions | null>(null);
+
+  const [showAddFriend, setShowAddFriend] = useState(false);
+  const [friendName, setFriendName] = useState("");
+  const [friendZone, setFriendZone] = useState("");
+  const [isAddingFriend, setIsAddingFriend] = useState(false);
+
+  useEffect(() => {
+    if (dashboard && !assumptionsForm) {
+      setAssumptionsForm(dashboard.assumptions);
+    }
+  }, [dashboard, assumptionsForm]);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,11 +249,11 @@ export default function App() {
       setDashboard((current) =>
         current
           ? {
-              ...current,
-              course: response.course,
-              assignments: response.assignments,
-              ledger: response.ledger,
-            }
+            ...current,
+            course: response.course,
+            assignments: response.assignments,
+            ledger: response.ledger,
+          }
           : current,
       );
     } catch (uploadError) {
@@ -246,6 +261,47 @@ export default function App() {
     } finally {
       setIsUploading(false);
       event.target.value = "";
+    }
+  }
+
+  async function handleSaveSettings() {
+    if (!assumptionsForm) return;
+    try {
+      await putUserAssumptions(assumptionsForm);
+      const response = await fetchDashboard();
+      setDashboard(response);
+      setShowSettings(false);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to update settings");
+    }
+  }
+
+  async function handleSyncCalendar() {
+    setIsSyncingCalendar(true);
+    // Redirect directly to Google OAuth login
+    // After the user authenticates, Google redirects back to our callback
+    // which sets the session and redirects them back to the frontend
+    window.location.href = getGoogleOAuthUrl();
+  }
+
+  async function handleAddFriendSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!friendName || !friendZone) return;
+
+    setIsAddingFriend(true);
+    try {
+      await addFriend(friendName, friendZone);
+      // Wait a moment then refresh dashboard to hopefully see the new friend factored in (if seeded data supports it)
+      const newDash = await fetchDashboard();
+      setDashboard(newDash);
+      setShowAddFriend(false);
+      setFriendName("");
+      setFriendZone("");
+      alert(`Successfully added ${friendName} to Kairos!`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add friend");
+    } finally {
+      setIsAddingFriend(false);
     }
   }
 
@@ -288,6 +344,15 @@ export default function App() {
               {isUploading ? "Parsing syllabus..." : "Upload syllabus"}
               <input type="file" accept=".pdf,.txt,.doc,.docx" onChange={handleUpload} hidden />
             </label>
+            <button className="secondary-button" onClick={() => setShowSettings(true)}>
+              User Settings
+            </button>
+            <button className="secondary-button" onClick={() => setShowAddFriend(true)}>
+              + Add Friend
+            </button>
+            <button className="secondary-button" onClick={handleSyncCalendar} disabled={isSyncingCalendar}>
+              {isSyncingCalendar ? "Syncing..." : "Connect Google Calendar"}
+            </button>
           </div>
 
           <div className="hero-metrics">
@@ -556,6 +621,118 @@ export default function App() {
           </motion.article>
         </section>
       </main>
+
+      {showSettings && assumptionsForm && (
+        <div className="modal-overlay">
+          <motion.div
+            className="modal-content card"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">User Control</p>
+                <h3>Adjust Assumptions</h3>
+              </div>
+            </div>
+
+            <div className="settings-form">
+              <label>
+                <span>Reading Speed (pages per hour)</span>
+                <input
+                  type="number"
+                  value={assumptionsForm.reading_speed_pph}
+                  onChange={e => setAssumptionsForm({ ...assumptionsForm, reading_speed_pph: Number(e.target.value) })}
+                />
+              </label>
+              <label>
+                <span>Major Difficulty Multiplier</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={assumptionsForm.major_difficulty_multiplier}
+                  onChange={e => setAssumptionsForm({ ...assumptionsForm, major_difficulty_multiplier: Number(e.target.value) })}
+                />
+              </label>
+              <label>
+                <span>Historical Productivity Multiplier</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={assumptionsForm.historical_productivity_multiplier}
+                  onChange={e => setAssumptionsForm({ ...assumptionsForm, historical_productivity_multiplier: Number(e.target.value) })}
+                />
+              </label>
+              <label>
+                <span>Social Readiness Goal (weekly hours)</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={assumptionsForm.social_readiness_goal_hours}
+                  onChange={e => setAssumptionsForm({ ...assumptionsForm, social_readiness_goal_hours: Number(e.target.value) })}
+                />
+              </label>
+            </div>
+
+            <div className="modal-actions">
+              <button className="secondary-button" onClick={() => {
+                setAssumptionsForm(dashboard!.assumptions);
+                setShowSettings(false);
+              }}>Cancel</button>
+              <button className="primary-button" onClick={handleSaveSettings}>Save & Recalculate</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showAddFriend && (
+        <div className="modal-overlay">
+          <motion.div
+            className="modal-content card"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Social Network</p>
+                <h3>Add a Friend</h3>
+              </div>
+            </div>
+
+            <form className="settings-form" onSubmit={handleAddFriendSubmit}>
+              <label>
+                <span>Friend's Name</span>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Maya"
+                  value={friendName}
+                  onChange={(e) => setFriendName(e.target.value)}
+                />
+              </label>
+              <label>
+                <span>Home Zone (Where do they live?)</span>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. North Campus"
+                  value={friendZone}
+                  onChange={(e) => setFriendZone(e.target.value)}
+                />
+              </label>
+
+              <div className="modal-actions" style={{ marginTop: '24px' }}>
+                <button type="button" className="secondary-button" onClick={() => setShowAddFriend(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary-button" disabled={isAddingFriend}>
+                  {isAddingFriend ? "Adding..." : "Add to Network"}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

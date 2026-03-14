@@ -15,6 +15,7 @@ from .mock_data import (
 )
 from .schemas import (
     Assignment,
+    AvailabilityWindow,
     Course,
     FriendAvailability,
     IdleEvent,
@@ -38,6 +39,15 @@ def get_connection() -> sqlite3.Connection:
 def initialize_database() -> None:
     with get_connection() as connection:
       connection.executescript(SCHEMA_PATH.read_text())
+      
+      # Basic migration: try adding new columns safely
+      try:
+          connection.execute("ALTER TABLE users ADD COLUMN google_access_token TEXT")
+          connection.execute("ALTER TABLE users ADD COLUMN google_refresh_token TEXT")
+          connection.execute("ALTER TABLE users ADD COLUMN token_expiry DATETIME")
+      except sqlite3.OperationalError:
+          pass # Columns already exist
+          
       seeded = connection.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
       if seeded:
           return
@@ -241,13 +251,163 @@ def load_demo_snapshot() -> tuple[
         return assumptions, course, assignments, friends, schedule, idle_event, weather
 
 
-def replace_assignments(course: Course, assignments: list[Assignment]) -> None:
+def upsert_user(
+    user_id: str,
+    name: str,
+    email: str,
+    access_token: str,
+    refresh_token: str | None,
+    token_expiry: str | None,
+) -> None:
     with get_connection() as connection:
-        connection.execute("DELETE FROM courses WHERE user_id = ?", (DEMO_USER_ID,))
-        connection.execute("DELETE FROM assignments WHERE user_id = ?", (DEMO_USER_ID,))
+        user = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if user:
+            connection.execute(
+                """
+                UPDATE users
+                SET name = ?, email = ?, google_access_token = ?, google_refresh_token = COALESCE(?, google_refresh_token), token_expiry = ?
+                WHERE id = ?
+                """,
+                (name, email, access_token, refresh_token, token_expiry, user_id),
+            )
+        else:
+            # Seed the default assumptions for a new user
+            connection.execute(
+                """
+                INSERT INTO users (
+                    id, name, email, major, reading_speed_pph,
+                    major_difficulty_multiplier, historical_productivity_multiplier,
+                    social_readiness_goal_hours, google_access_token, google_refresh_token, token_expiry
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id, name, email, "Undeclared", 28, 1.1, 0.95, 6.0,
+                    access_token, refresh_token, token_expiry
+                ),
+            )
+            # Seed basic mock data so their dashboard isn't completely empty
+            connection.execute(
+                "INSERT INTO weather_context (id, summary, condition, temperature_f) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                (1, "Sunset approaching", "clear", 68)
+            )
+
+def get_user_tokens(user_id: str) -> dict | None:
+    with get_connection() as connection:
+        row = connection.execute("SELECT google_access_token, google_refresh_token FROM users WHERE id = ?", (user_id,)).fetchone()
+        if row and row["google_access_token"]:
+            return dict(row)
+        return None
+
+def save_schedule_blocks(user_id: str, blocks: list[ScheduleBlock]) -> None:
+    with get_connection() as connection:
+        # Clear existing schedule blocks for this user
+        connection.execute("DELETE FROM schedule_blocks WHERE user_id = ?", (user_id,))
+        # Insert new ones
+        if not blocks: return
+        connection.executemany(
+            """
+            INSERT INTO schedule_blocks (id, user_id, label, block_type, start_at, end_at, movable, intensity)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    block.id,
+                    user_id,
+                    block.label,
+                    block.block_type,
+                    block.start_at.isoformat(),
+                    block.end_at.isoformat(),
+                    int(block.movable),
+                    block.intensity,
+                )
+                for block in blocks
+            ],
+        )
+
+def get_user_schedule(user_id: str) -> list[ScheduleBlock]:
+    with get_connection() as connection:
+        rows = connection.execute("SELECT * FROM schedule_blocks WHERE user_id = ?", (user_id,)).fetchall()
+        return [
+            ScheduleBlock(
+                id=r["id"],
+                label=r["label"],
+                block_type=r["block_type"],
+                start_at=datetime.fromisoformat(r["start_at"]),
+                end_at=datetime.fromisoformat(r["end_at"]),
+                movable=bool(r["movable"]),
+                intensity=r["intensity"],
+            )
+            for r in rows
+        ]
+
+def get_user_assignments(user_id: str) -> tuple[Course, list[Assignment]]:
+    with get_connection() as connection:
+        course_row = connection.execute("SELECT * FROM courses WHERE user_id = ?", (user_id,)).fetchone()
+        if not course_row:
+             # Return empty mock if none exists
+             return Course(code="NONE 101", title="No Courses Yet"), []
+             
+        course = Course(code=course_row["code"], title=course_row["title"])
+        
+        assignment_rows = connection.execute("SELECT * FROM assignments WHERE user_id = ?", (user_id,)).fetchall()
+        assignments = [
+            Assignment(
+                id=r["id"],
+                course_code=r["course_code"],
+                title=r["title"],
+                task_type=r["task_type"],
+                due_at=datetime.fromisoformat(r["due_at"]),
+                base_effort_hours=r["base_effort_hours"],
+                estimated_weight=r["estimated_weight"],
+                reading_pages=r["reading_pages"],
+                status=r["status"],
+            )
+            for r in assignment_rows
+        ]
+        return course, assignments
+
+def get_user_friends(user_id: str) -> list[FriendAvailability]:
+    with get_connection() as connection:
+        friend_rows = connection.execute("SELECT * FROM friends WHERE user_id = ?", (user_id,)).fetchall()
+        
+        friends = []
+        for f_row in friend_rows:
+            window_rows = connection.execute("SELECT * FROM availability_windows WHERE friend_id = ?", (f_row["id"],)).fetchall()
+            windows = [
+                AvailabilityWindow(
+                    start_at=datetime.fromisoformat(w["start_at"]),
+                    end_at=datetime.fromisoformat(w["end_at"]),
+                    location_hint=w["location_hint"],
+                )
+                for w in window_rows
+            ]
+            friends.append(
+                FriendAvailability(
+                    friend_id=f_row["id"],
+                    friend_name=f_row["friend_name"],
+                    windows=windows
+                )
+            )
+        return friends
+
+def get_user_assumptions(user_id: str) -> UserAssumptions:
+    with get_connection() as connection:
+        user_row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        return UserAssumptions(
+            reading_speed_pph=user_row["reading_speed_pph"],
+            major_difficulty_multiplier=user_row["major_difficulty_multiplier"],
+            historical_productivity_multiplier=user_row["historical_productivity_multiplier"],
+            social_readiness_goal_hours=user_row["social_readiness_goal_hours"],
+        )
+
+
+def replace_assignments(user_id: str, course: Course, assignments: list[Assignment]) -> None:
+    with get_connection() as connection:
+        connection.execute("DELETE FROM courses WHERE user_id = ?", (user_id,))
+        connection.execute("DELETE FROM assignments WHERE user_id = ?", (user_id,))
         connection.execute(
             "INSERT INTO courses (id, user_id, code, title, syllabus_source) VALUES (?, ?, ?, ?, ?)",
-            ("course-upload", DEMO_USER_ID, course.code, course.title, "uploaded"),
+            ("course-upload", user_id, course.code, course.title, "uploaded"),
         )
         connection.executemany(
             """
@@ -259,7 +419,7 @@ def replace_assignments(course: Course, assignments: list[Assignment]) -> None:
             [
                 (
                     assignment.id,
-                    DEMO_USER_ID,
+                    user_id,
                     assignment.course_code,
                     assignment.title,
                     assignment.task_type,
@@ -271,4 +431,24 @@ def replace_assignments(course: Course, assignments: list[Assignment]) -> None:
                 )
                 for assignment in assignments
             ],
+        )
+
+def update_user_assumptions(user_id: str, assumptions: UserAssumptions) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE users
+            SET reading_speed_pph = ?,
+                major_difficulty_multiplier = ?,
+                historical_productivity_multiplier = ?,
+                social_readiness_goal_hours = ?
+            WHERE id = ?
+            """,
+            (
+                assumptions.reading_speed_pph,
+                assumptions.major_difficulty_multiplier,
+                assumptions.historical_productivity_multiplier,
+                assumptions.social_readiness_goal_hours,
+                user_id,
+            ),
         )

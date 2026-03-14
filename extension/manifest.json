@@ -1,0 +1,39 @@
+{
+    "manifest_version": 3,
+    "name": "Kairos Enforcer",
+    "version": "1.0",
+    "description": "Monitors deep focus sprints and intercepts distraction loops.",
+    "permissions": [
+        "tabs",
+        "storage",
+        "idle",
+        "scripting"
+    ],
+    "host_permissions": [
+        "http://localhost:8000/*",
+        "*://*.youtube.com/*",
+        "*://*.reddit.com/*",
+        "*://*.twitter.com/*",
+        "*://*.instagram.com/*"
+    ],
+    "background": {
+        "service_worker": "src/background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.youtube.com/*",
+                "*://*.reddit.com/*",
+                "*://*.twitter.com/*",
+                "*://*.instagram.com/*"
+            ],
+            "js": [
+                "src/content.js"
+            ],
+            "css": [
+                "src/styles.css"
+            ],
+            "run_at": "document_idle"
+        }
+    ]
+}

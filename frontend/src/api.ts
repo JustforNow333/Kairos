@@ -1,4 +1,4 @@
-import type { DashboardResponse, ParseResponse } from "./types";
+import type { DashboardResponse, ParseResponse, UserAssumptions } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -25,4 +25,35 @@ export async function uploadSyllabus(file: File): Promise<ParseResponse> {
   });
 
   return parseJson<ParseResponse>(response);
+}
+
+export async function putUserAssumptions(assumptions: UserAssumptions): Promise<{ status: string }> {
+  const response = await fetch(`${API_BASE}/api/v1/user/assumptions`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(assumptions),
+  });
+  return parseJson<{ status: string }>(response);
+}
+
+export function getGoogleOAuthUrl(): string {
+  return `${API_BASE}/api/v1/auth/google/login`;
+}
+
+export async function syncGoogleCalendar(): Promise<{ status: string, blocks_synced: number, mode: string }> {
+  const response = await fetch(`${API_BASE}/api/v1/user/sync-calendar`);
+  return parseJson<{ status: string, blocks_synced: number, mode: string }>(response);
+}
+
+export async function addFriend(friendName: string, homeZone: string): Promise<{ status: string, friend_id: string }> {
+  const response = await fetch(`${API_BASE}/api/v1/friends`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ friend_name: friendName, home_zone: homeZone }),
+  });
+  return parseJson<{ status: string, friend_id: string }>(response);
 }

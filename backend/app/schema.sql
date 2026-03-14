@@ -6,7 +6,10 @@ CREATE TABLE IF NOT EXISTS users (
     reading_speed_pph INTEGER NOT NULL,
     major_difficulty_multiplier REAL NOT NULL,
     historical_productivity_multiplier REAL NOT NULL,
-    social_readiness_goal_hours REAL NOT NULL
+    social_readiness_goal_hours REAL NOT NULL,
+    google_access_token TEXT,
+    google_refresh_token TEXT,
+    token_expiry DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS courses (
