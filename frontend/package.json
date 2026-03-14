@@ -1,0 +1,22 @@
+{
+  "name": "kairos-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "node ./node_modules/next/dist/bin/next dev",
+    "build": "node ./node_modules/next/dist/bin/next build",
+    "start": "node ./node_modules/next/dist/bin/next start"
+  },
+  "dependencies": {
+    "framer-motion": "^11.5.4",
+    "next": "^15.5.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.4",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.5.4",
+    "@types/node": "^22.7.4"
+  }
+}

@@ -1,0 +1,81 @@
+# AGENTS.md
+
+## Project overview
+
+KAIROS is a hackathon MVP for a Cornell-first "Life Operating System." The repository contains:
+- `backend/`: FastAPI service with mock syllabus parsing, work debt scoring, social pocket detection, social readiness scoring, shuffle planning, and a seeded SQLite demo store.
+- `frontend/`: Next.js dashboard and landing experience with Framer Motion.
+
+## Working agreements
+
+- Preserve the premium Cornell-focused product voice.
+- Keep the Dynamic Shuffle interaction as the centerpiece of the UI.
+- Prefer mocked adapters over hardcoded UI-only data when adding new demo flows.
+- Maintain clean separation between domain logic in `backend/app/services` and presentation logic in `frontend/src`.
+- Optimize every change for the 3-5 minute judge demo, not feature completeness.
+
+## Primary commands
+
+### Backend
+```bash
+python3 -m venv venv
+source venv/bin/activate
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --reload-dir app
+```
+
+Windows PowerShell variant:
+```powershell
+py -3.11 -m venv venv
+.\venv\Scripts\Activate.ps1
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --reload-dir app
+```
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend note:
+- Install and run the frontend from the same OS shell. If you use PowerShell, run `npm install` and `npm run dev` in PowerShell so Windows-compatible `node_modules` shims are created.
+
+### Verification
+```bash
+cd backend && python3 -m compileall app
+cd frontend && npm run build
+```
+
+### Environment safety
+
+- Do not keep a Python virtualenv inside `backend/` when running the app from Windows with `--reload`; Uvicorn can fail while scanning Linux-style symlinks.
+- Keep the backend virtualenv at the repo root as `venv/`, or otherwise outside the watched `backend/` tree.
+- Do not run `npm install` from WSL and then try to use the resulting `node_modules` from PowerShell. Reinstall in the shell you plan to use.
+- This repo is not a root-level Node workspace. Do not create a root `package-lock.json`.
+
+## Backend conventions
+
+- Extend API contracts in `backend/app/schemas.py`.
+- Keep the demo data layer in `backend/app/db.py` and `backend/app/schema.sql`.
+- Keep deterministic demo data in `backend/app/mock_data.py`.
+- Put scoring and scheduling logic in `backend/app/services/scheduler.py`.
+- Keep syllabus parsing behind `backend/app/services/parser.py` so a real LLM provider can replace the mock later.
+
+## Frontend conventions
+
+- Keep the current visual language: warm neutrals, Cornell red accents, fluid motion.
+- Use Framer Motion for meaningful transitions, especially schedule reshuffling.
+- Prefer typed API helpers in `frontend/src/api.ts`.
+- Keep component state simple and local unless a cross-page need emerges.
+- Preserve the story rail and judge-mode sequence unless there is a better demo narrative.
+
+## Next upgrades
+
+- Replace the mock parser with OpenAI file parsing.
+- Add SQLite or Postgres persistence behind the current schema.
+- Swap mocked friend availability for Google Calendar integration.
+- Add a lightweight Chrome extension or event simulator for idle detection.
