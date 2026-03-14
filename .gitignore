@@ -16,6 +16,8 @@ coverage.xml
 .venv/
 venv/
 env/
+backend/.venv/
+frontend/.vercel/
 
 # Environment files
 .env
@@ -28,6 +30,7 @@ node_modules/
 frontend/node_modules/
 .next/
 dist/
+out/
 frontend/dist/
 frontend/.next/
 frontend/*.js
@@ -48,5 +51,6 @@ backend/kairos.db
 *.sqlite3
 *.db
 *.log
+.tmp/
 tmp/
 temp/
