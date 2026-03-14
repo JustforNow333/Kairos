@@ -46,8 +46,179 @@ cd frontend && npm run build
 - Install frontend dependencies in the same shell you will use to run them. If you use PowerShell, run both `npm install` and `npm run dev` in PowerShell so Windows `next.cmd` shims are present.
 - This repo is not a root-level Node workspace. If a root `package-lock.json` appears, remove it.
 
+## Fateweaver Protocol
+
+### 1. Strong product definition
+Fateweaver Protocol is KAIROS’s signature mechanism for reclaiming meaningful life moments before they disappear. It detects a high-value social opportunity, checks whether that moment is still realistically attainable, and then actively rewrites the user’s day around it. Instead of showing a passive calendar, KAIROS presents a better version of the day and makes the tradeoff legible: what to move, what to compress, what to do now, and what becomes possible if the user acts.
+
+This is the flagship feature because it turns the product from a tracker into an intervention. It does not merely describe the user’s schedule. It reshapes it around moments that would otherwise be lost.
+
+### 2. Plain-English feature description
+Fateweaver Protocol is an intelligent reweaving of the day. It looks at what the user has to do, spots a social window that actually matters, checks what work can move, and proposes a cleaner plan that makes the opportunity possible.
+
+It is not rigid scheduling. It is not calendar perfectionism. It is not formal optimization math. It is a practical product behavior: find the moment worth saving, make a believable plan to save it, and show the user how to get there.
+
+### 3. Core user value
+College students do not just lose time. They lose specific nights, specific friendships, specific campus moments, and then they carry the guilt of both unfinished work and missed experiences. That is the emotional hole Fateweaver Protocol addresses.
+
+The feature matters because it resolves four things at once:
+- missed experiences: the best social moments are short-lived and easy to miss
+- passive idling: the day often collapses into scrolling, dithering, and low-value drift
+- productivity guilt: students feel behind even when there is still a recoverable path
+- social FOMO: they do not just want free time, they want a reason to actually use it
+
+When KAIROS says, in effect, “If you do these two things differently, you can still make sunset on the Slope with your friends,” that feels emotionally powerful in a way a normal planner never does.
+
+### 4. MVP mechanics
+The minimum hackathon version of Fateweaver Protocol should be simple, legible, and convincing.
+
+Inputs:
+- current schedule blocks for the day
+- assignment list with due times, task type, and estimated effort
+- friend availability windows
+- a small set of user assumptions such as reading speed and historical productivity
+- lightweight context such as weather, time of day, and preferred location
+
+Movable work blocks:
+- independent study sessions
+- reading blocks
+- problem set blocks
+- writing or admin blocks without a hard start time
+
+Not movable:
+- classes
+- meetings
+- meals or anchors you want to preserve
+- any block marked fixed or high-friction to move
+
+High-value social opportunity:
+- at least two friends overlap
+- timing is soon enough to feel urgent
+- duration is realistic, ideally 30 to 60 minutes
+- context is emotionally attractive, such as clear weather or a strong Cornell location
+- the opportunity sounds like something a student would actually want to claim
+
+Plausibility check:
+- can conflicting work blocks be moved earlier or later without breaking fixed obligations
+- can any block be compressed slightly without becoming absurd
+- does the plan require only a believable focus boost, not superhero discipline
+- does the social window still feel worth the tradeoff after the rewrite
+
+AI-generated optimization strategies:
+- generated after the app has identified the target pocket and the conflicting work
+- shown as tactics attached to the rewritten plan
+- phrased as concrete moves tied to unlocking that specific window
+- limited to a few sharp suggestions, not a wall of advice
+
+### 5. AI strategy layer
+The AI agent’s job is not to “solve the schedule.” Its job is to make the rewoven plan feel smart, tactical, and personal.
+
+The AI should:
+- analyze the workload, block types, deadlines, and time of day
+- identify where work can be compressed, moved, batched, or downgraded to a good-enough pass
+- generate tactics that are directly tied to the target opportunity
+- explain tradeoffs in plain English so the user knows what they gain and what they risk
+- make the plan feel tailored to this day, this workload, and this moment
+
+Good AI suggestions sound like this:
+- “Do the reading in focused skim mode and extract only discussion-critical points.”
+- “Finish the problem set’s easy questions first to secure most of the progress quickly.”
+- “Move this writing task to tonight since your historical focus is stronger then.”
+- “Batch these two admin tasks together to free up a clean 30-minute block.”
+- “Use a 25-minute sprint to unlock this social window.”
+
+Bad AI suggestions sound like generic self-help. If the advice would make sense on any random productivity app, it is not good enough for Fateweaver Protocol.
+
+### 6. User flow
+The ideal flow is:
+1. KAIROS detects a valuable social opportunity forming.
+2. It checks the current day and identifies the work standing in the way.
+3. It finds which blocks are movable and whether the tradeoff is plausible.
+4. It generates a rewritten version of the day.
+5. It attaches a small number of context-aware efficiency tactics.
+6. The user sees a before-versus-after view with a clear gain.
+7. The user accepts or declines the rewrite.
+8. If accepted, the schedule updates visually and the moment feels newly real.
+
+The key is that the product should feel decisive. It should not ask the user to manually negotiate fifteen little calendar edits.
+
+### 7. UX copy
+Short definition:
+Fateweaver Protocol rewrites your day to save the moments that matter.
+
+Landing-page description:
+KAIROS does not just organize your schedule. Fateweaver Protocol detects the social windows worth claiming, rewires flexible work around them, and gives you a sharper, more human version of the day.
+
+In-app explanation:
+We found a window worth protecting. Fateweaver Protocol moved flexible work, tightened the low-risk tasks, and built you a believable path to make it.
+
+Notification example:
+Fateweaver Protocol found a recoverable night: 45 minutes of focused work now unlocks sunset on Libe Slope with 5 friends.
+
+Before vs after explanation:
+Before: your day drifts toward fragmented work and a missed opportunity.
+After: one focused sprint, one moved block, and the night opens back up.
+
+### 8. Demo framing
+In the demo, the user should first see a day that feels full but salvageable. Then KAIROS surfaces a social opportunity that feels specific and desirable. The moment Fateweaver Protocol activates, the schedule should visibly reweave itself: work blocks slide, the social block appears, and the tradeoff statement sharpens.
+
+What should animate:
+- the target opportunity becoming “claimable”
+- conflicting work blocks relocating in the day view
+- a new social block appearing as the earned outcome
+- a strategy panel revealing the exact tactics that make the plan believable
+
+How to explain the magic:
+- show the old day first
+- name the lost moment
+- show the rewoven day
+- explain the tradeoff in one sentence
+- point to the AI strategies as the reason the plan feels achievable rather than theatrical
+
+Those AI strategies are the believability layer. They make the feature feel less like animation polish and more like intelligence.
+
+### 9. Implementation guidance
+Build the MVP with a split between simple rules and selective AI.
+
+What can be mocked:
+- friend availability
+- weather context
+- idle detection
+- user productivity profile
+
+What should be rule-based:
+- work debt scoring
+- social pocket ranking
+- movable vs fixed block detection
+- plausibility checks for rescheduling
+- focus boost limits
+
+Where AI is actually useful:
+- generating the tactical work-compression strategies
+- rewriting tradeoff explanations in polished, human language
+- turning a dry schedule move into a personalized recommendation
+
+How to make it feel intelligent quickly:
+- use deterministic rules to choose the opportunity and rewrite the day
+- use AI only after the system already knows what it wants the user to do
+- keep the suggestions tightly grounded in the chosen pocket, the conflicting blocks, and the user profile
+- show only the top two or three tactics so the feature feels sharp, not noisy
+
+For the MVP, the current `shuffle_plan` backend contract can remain in place as the implementation layer. Fateweaver Protocol is the product name and UX framing for that mechanism.
+
+### 10. Naming and positioning
+`Dynamic Shuffle` sounds like UI motion. `Fateweaver Protocol` sounds like a proprietary mechanism with judgment, intent, and consequence.
+
+The name is stronger because it implies:
+- the day is being actively rewoven, not randomly rearranged
+- the feature has a distinct product identity
+- the outcome is emotional, not merely operational
+- KAIROS is not just helping manage time, it is altering the trajectory of the day
+
+That supports the brand. KAIROS is not a planner. It is a life arbitrage engine, and Fateweaver Protocol sounds like the engine’s crown jewel.
+
 ## 1. Thesis
-KAIROS can win a hackathon because it attacks a real emotional problem, not just a workflow problem: college students do not need another calendar, they need a system that resolves the tension between academic guilt, social FOMO, and passive idling. The MVP should feel magical by doing one thing extremely well: turning a vague tradeoff into a visible, emotionally charged decision, then proving it with the Dynamic Shuffle. If the demo clearly shows coursework being priced, a high-value Cornell social pocket being detected, and the schedule physically reorganizing itself to unlock that moment, judges will understand the product in under 30 seconds and remember it after every other “AI planner” blurs together.
+KAIROS can win a hackathon because it attacks a real emotional problem, not just a workflow problem: college students do not need another calendar, they need a system that resolves the tension between academic guilt, social FOMO, and passive idling. The MVP should feel magical by doing one thing extremely well: turning a vague tradeoff into a visible, emotionally charged decision, then proving it with Fateweaver Protocol. If the demo clearly shows coursework being priced, a high-value Cornell social pocket being detected, and the schedule physically reorganizing itself to unlock that moment, judges will understand the product in under 30 seconds and remember it after every other “AI planner” blurs together.
 
 ## 2. The Exact Demo Story
 1. Open the dashboard already seeded with a believable Cornell day.
@@ -56,7 +227,7 @@ KAIROS can win a hackathon because it attacks a real emotional problem, not just
 4. Highlight the Work Debt panel: show hours owed, procrastination drag, and urgency multipliers.
 5. Move to Social Gravity: KAIROS shows a 45-minute sunset pocket with 5 friends free at Libe Slope.
 6. Trigger Idle Intervention: “20 mins of YouTube vs. Sunset at the Slope.”
-7. Click `Trigger Dynamic Shuffle` or `Play demo story`.
+7. Click `Trigger Fateweaver Protocol` or `Play demo story`.
 8. The schedule animates. A work block snaps earlier, the social block appears, and the tradeoff statement updates: `If you focus for the next hour at 1.2x pace, you unlock Sunset at the Slope with 5 friends.`
 9. End on the social/readiness framing: KAIROS did not just organize tasks, it created a better life outcome.
 
@@ -64,7 +235,7 @@ KAIROS can win a hackathon because it attacks a real emotional problem, not just
 - Backend API contract
 - Work Debt scoring
 - Social pocket detection
-- Dynamic Shuffle output and animation
+- Fateweaver Protocol output, tactics, and animation
 - Syllabus upload request flow
 
 ### What is mocked on purpose
@@ -85,7 +256,7 @@ KAIROS can win a hackathon because it attacks a real emotional problem, not just
 - Syllabus upload interaction
 - Work Debt Ledger with urgency and delay cost
 - Social Gravity list with Cornell-specific opportunities
-- Dynamic Shuffle animation as the centerpiece
+- Fateweaver Protocol as the centerpiece
 - Idle Intervention card tied to Social Readiness
 
 ### Nice-to-have
@@ -98,21 +269,21 @@ KAIROS can win a hackathon because it attacks a real emotional problem, not just
 - Real auth
 - Real calendar write-back
 - Multi-user collaboration
-- Production-grade optimization engine
+- Formal mathematical optimization or operations research framing
 - Shipping a browser extension during the hackathon
 
 ## 4. Product Spec
 
 ### Main screens
-- `Landing + Hero`: immediately explains the product as a life optimization engine, not a task app.
-- `Dashboard`: the main demo screen with Work Debt, Social Gravity, Dynamic Shuffle, Idle Intervention, and Social Readiness.
+- `Landing + Hero`: immediately explains the product as a life arbitrage engine, not a task app.
+- `Dashboard`: the main demo screen with Work Debt, Social Gravity, Fateweaver Protocol, Idle Intervention, and Social Readiness.
 - `Upload flow`: lightweight overlay or button interaction that updates the ledger after syllabus parsing.
 
 ### Key user actions
 - Upload a syllabus.
 - Inspect the Work Debt Ledger.
 - Review the best social opportunity.
-- Trigger Dynamic Shuffle.
+- Trigger Fateweaver Protocol.
 - Respond to the idle intervention.
 
 ### Core states and outputs
@@ -129,7 +300,7 @@ KAIROS can win a hackathon because it attacks a real emotional problem, not just
 ### Screen-level intent
 - Work Debt should feel high-stakes.
 - Social Gravity should feel tempting and concrete.
-- Dynamic Shuffle should feel like the app is making life happen.
+- Fateweaver Protocol should feel like the app is making life happen.
 - Idle Intervention should feel urgent, not naggy.
 
 ## 5. Architecture
@@ -178,7 +349,7 @@ KAIROS can win a hackathon because it attacks a real emotional problem, not just
 1. Backend seeds the demo database.
 2. Frontend requests `/api/v1/dashboard/overview`.
 3. Backend returns the entire story payload.
-4. Frontend renders the dashboard and animates the Dynamic Shuffle.
+4. Frontend renders the dashboard and animates Fateweaver Protocol.
 5. Uploading a syllabus hits `/api/v1/syllabus/parse` and updates assignments plus ledger.
 
 ## 6. Data Model
@@ -321,11 +492,11 @@ social_readiness_score =
 - Layout animation for schedule blocks using Framer Motion.
 - Story rail that walks judges through the demo sequence.
 
-### Dynamic Shuffle
+### Fateweaver Protocol
 - Use one vertical day view.
 - Render `before_blocks` and `after_blocks` in the same component.
 - Animate with `layout` transitions so blocks physically relocate rather than re-rendering in place.
-- Pair the animation with a plain-English tradeoff sentence.
+- Pair the animation with a plain-English tradeoff sentence and 2-3 tactical AI strategies.
 
 ### Emotional payoff
 - The best pocket should sound like something a Cornell student would actually want to do.
@@ -337,14 +508,14 @@ social_readiness_score =
 - [main.py](/mnt/c/Kairos/backend/app/main.py#L1): FastAPI routes and overview assembly
 - [db.py](/mnt/c/Kairos/backend/app/db.py#L1): seeded SQLite store
 - [schemas.py](/mnt/c/Kairos/backend/app/schemas.py#L1): API models
-- [scheduler.py](/mnt/c/Kairos/backend/app/services/scheduler.py#L1): Work Debt, Social Gravity, Social Readiness, Dynamic Shuffle logic
+- [scheduler.py](/mnt/c/Kairos/backend/app/services/scheduler.py#L1): Work Debt, Social Gravity, Social Readiness, and Fateweaver Protocol planning logic
 - [parser.py](/mnt/c/Kairos/backend/app/services/parser.py#L1): mock parser abstraction
 
 ### Frontend
 - [App.tsx](/mnt/c/Kairos/frontend/src/App.tsx#L1): main demo surface
 - [api.ts](/mnt/c/Kairos/frontend/src/api.ts#L1): frontend API client
 - [types.ts](/mnt/c/Kairos/frontend/src/types.ts#L1): response types
-- [styles.css](/mnt/c/Kairos/frontend/src/styles.css#L1): visual system and layout
+- [globals.css](/mnt/c/Kairos/frontend/app/globals.css#L1): visual system and layout
 
 ### Local run
 
@@ -394,16 +565,18 @@ The repository includes a root [.gitignore](/mnt/c/Kairos/.gitignore#L1) with th
 ## 11. Build Order For The Hackathon
 1. Build the single overview endpoint and seed it with a perfect Cornell day.
 2. Build the dashboard shell and vertical schedule.
-3. Implement the Dynamic Shuffle animation before anything else. This is the demo.
-4. Add Work Debt scoring and the ledger visualization.
-5. Add Social Gravity ranking with emotionally attractive copy.
-6. Add the idle intervention and Social Readiness framing.
-7. Add syllabus upload last, using a mocked parser if necessary.
+3. Implement Fateweaver Protocol before anything else. This is the demo.
+4. Make the rewrite believable with context-aware AI tactics, not generic advice.
+5. Add Work Debt scoring and the ledger visualization.
+6. Add Social Gravity ranking with emotionally attractive copy.
+7. Add the idle intervention and Social Readiness framing.
+8. Add syllabus upload last, using a mocked parser if necessary.
 
 ### Risky parts
 - Overbuilding the backend instead of polishing the one demo path.
-- A weak shuffle animation that feels like a data refresh instead of a life optimization engine.
+- A weak Fateweaver moment that feels like a data refresh instead of a life arbitrage engine.
 - Generic UI language that makes the product sound like another student planner.
+- AI strategy copy that sounds like generic productivity blogging instead of tactical guidance.
 
 ### Perceived sophistication per hour spent
 - Highest ROI: strong seeded data, premium UI, motion polish, crisp narrative copy.
@@ -411,4 +584,4 @@ The repository includes a root [.gitignore](/mnt/c/Kairos/.gitignore#L1) with th
 - Low ROI during hackathon: real integrations unless they are already trivial.
 
 ### Final rule
-If a feature is not visible in the 3-5 minute judge demo, it should not outrank polish on the Dynamic Shuffle, the idle alert, or the Cornell-specific social pocket.
+If a feature is not visible in the 3-5 minute judge demo, it should not outrank polish on Fateweaver Protocol, the idle alert, or the Cornell-specific social pocket.

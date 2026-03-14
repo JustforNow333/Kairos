@@ -3,16 +3,23 @@
 ## Project overview
 
 KAIROS is a hackathon MVP for a Cornell-first "Life Operating System." The repository contains:
-- `backend/`: FastAPI service with mock syllabus parsing, work debt scoring, social pocket detection, social readiness scoring, shuffle planning, and a seeded SQLite demo store.
+- `backend/`: FastAPI service with mock syllabus parsing, work debt scoring, social pocket detection, social readiness scoring, Fateweaver Protocol planning, and a seeded SQLite demo store.
 - `frontend/`: Next.js dashboard and landing experience with Framer Motion.
 
 ## Working agreements
 
 - Preserve the premium Cornell-focused product voice.
-- Keep the Dynamic Shuffle interaction as the centerpiece of the UI.
+- Keep Fateweaver Protocol as the centerpiece of the product and the UI.
 - Prefer mocked adapters over hardcoded UI-only data when adding new demo flows.
 - Maintain clean separation between domain logic in `backend/app/services` and presentation logic in `frontend/src`.
 - Optimize every change for the 3-5 minute judge demo, not feature completeness.
+
+## Flagship feature
+
+- Product language should refer to the old Dynamic Shuffle experience as `Fateweaver Protocol`.
+- Fateweaver Protocol is not formal optimization math. It is the product mechanism that detects a meaningful social opportunity, checks whether it is realistically claimable, rewrites flexible work blocks, and gives the user a better version of the day.
+- Treat AI strategy suggestions as part of the mechanism, not garnish. They should be situational, tied to unlocking a specific window, and phrased like tactical advice rather than generic productivity content.
+- When product copy and implementation language diverge, keep premium product-facing language in the UI and docs, but it is acceptable for internal code and API names to remain `shuffle`-based during the MVP.
 
 ## Primary commands
 
@@ -68,7 +75,7 @@ cd frontend && npm run build
 ## Frontend conventions
 
 - Keep the current visual language: warm neutrals, Cornell red accents, fluid motion.
-- Use Framer Motion for meaningful transitions, especially schedule reshuffling.
+- Use Framer Motion for meaningful transitions, especially the visible “rewoven day” moment in Fateweaver Protocol.
 - Prefer typed API helpers in `frontend/src/api.ts`.
 - Keep component state simple and local unless a cross-page need emerges.
 - Preserve the story rail and judge-mode sequence unless there is a better demo narrative.
