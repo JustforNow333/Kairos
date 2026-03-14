@@ -5,9 +5,11 @@ from datetime import datetime
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from .config import settings
 from .db import initialize_database, load_demo_snapshot, replace_assignments
 from .schemas import DashboardResponse, IdleAlertRequest, ShuffleRequest, SocialPocketRequest
 from .services.parser import parse_syllabus
+from .services.weather import fetch_live_weather
 from .services.scheduler import (
     build_idle_alert,
     build_shuffle_plan,
@@ -41,6 +43,8 @@ def health() -> dict[str, str]:
 @app.get("/api/v1/dashboard/overview", response_model=DashboardResponse)
 def dashboard_overview() -> DashboardResponse:
     assumptions, course, assignments, friends, current_schedule, idle_event, weather = load_demo_snapshot()
+    if not settings.USE_MOCK_DATA:
+        weather = fetch_live_weather()
     pockets = find_social_pockets(friends, weather)
     ledger = build_work_debt_ledger(assignments, assumptions)
     social_readiness = build_social_readiness(current_schedule, pockets, assumptions)
@@ -74,6 +78,8 @@ async def syllabus_parse(file: UploadFile = File(...)):
 @app.post("/api/v1/social/pockets")
 def social_pockets(request: SocialPocketRequest):
     _, _, _, _, _, _, weather = load_demo_snapshot()
+    if not settings.USE_MOCK_DATA:
+        weather = fetch_live_weather()
     return find_social_pockets(request.friends, weather)
 
 
