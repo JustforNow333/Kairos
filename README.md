@@ -37,6 +37,10 @@ npm install
 npm run dev
 ```
 
+Vercel deployment:
+- Deploy the Next.js app from `frontend/`, or keep the repo root and use the included [vercel.json](/mnt/c/Kairos/vercel.json).
+- Set `NEXT_PUBLIC_API_BASE_URL` in Vercel to your deployed backend URL.
+
 One-command Windows frontend startup from the repo root:
 
 ```powershell
