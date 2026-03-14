@@ -9,9 +9,8 @@ macOS / Linux / WSL:
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload --reload-dir app
+uvicorn backend.app.main:app --reload --reload-dir backend/app
 ```
 
 Windows PowerShell:
@@ -19,9 +18,15 @@ Windows PowerShell:
 ```powershell
 py -3.11 -m venv venv
 .\venv\Scripts\Activate.ps1
-cd backend
+python -m pip install --upgrade pip
 pip install -r requirements.txt
-uvicorn app.main:app --reload --reload-dir app
+uvicorn backend.app.main:app --reload --reload-dir backend/app
+```
+
+One-command Windows backend startup from the repo root:
+
+```powershell
+.\start-backend.ps1
 ```
 
 ### Frontend
@@ -32,17 +37,23 @@ npm install
 npm run dev
 ```
 
+One-command Windows frontend startup from the repo root:
+
+```powershell
+.\start-frontend.ps1
+```
+
 ### Verification
 
 ```bash
-cd backend && python3 -m compileall app
+python -m compileall backend/app
 cd frontend && npm run build
 ```
 
 ## Environment Notes
 
-- Keep the backend virtualenv at the repo root as `venv/` when you are running Uvicorn from Windows. A nested `backend/.venv` can break `--reload` when it contains Linux-style symlinks.
-- Use `--reload-dir app` for the backend dev server so Uvicorn only watches source files.
+- The root `requirements.txt` installs the backend Python dependencies so you can run the API from the project root.
+- Use `--reload-dir backend/app` for the backend dev server so Uvicorn only watches source files.
 - Install frontend dependencies in the same shell you will use to run them. If you use PowerShell, run both `npm install` and `npm run dev` in PowerShell so Windows `next.cmd` shims are present.
 - This repo is not a root-level Node workspace. If a root `package-lock.json` appears, remove it.
 
@@ -522,11 +533,8 @@ social_readiness_score =
 Backend:
 
 ```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn backend.app.main:app --reload --reload-dir backend/app
 ```
 
 Frontend:

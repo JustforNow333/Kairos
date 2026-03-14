@@ -27,18 +27,21 @@ KAIROS is a hackathon MVP for a Cornell-first "Life Operating System." The repos
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload --reload-dir app
+uvicorn backend.app.main:app --reload --reload-dir backend/app
 ```
 
 Windows PowerShell variant:
 ```powershell
 py -3.11 -m venv venv
 .\venv\Scripts\Activate.ps1
-cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload --reload-dir app
+uvicorn backend.app.main:app --reload --reload-dir backend/app
+```
+
+Windows shortcut:
+```powershell
+.\start-backend.ps1
 ```
 
 ### Frontend
@@ -48,19 +51,24 @@ npm install
 npm run dev
 ```
 
+Windows shortcut:
+```powershell
+.\start-frontend.ps1
+```
+
 Frontend note:
 - Install and run the frontend from the same OS shell. If you use PowerShell, run `npm install` and `npm run dev` in PowerShell so Windows-compatible `node_modules` shims are created.
 
 ### Verification
 ```bash
-cd backend && python3 -m compileall app
+python3 -m compileall backend/app
 cd frontend && npm run build
 ```
 
 ### Environment safety
 
-- Do not keep a Python virtualenv inside `backend/` when running the app from Windows with `--reload`; Uvicorn can fail while scanning Linux-style symlinks.
 - Keep the backend virtualenv at the repo root as `venv/`, or otherwise outside the watched `backend/` tree.
+- Keep `--reload-dir backend/app` on the backend dev server so Uvicorn only watches source files, not the environment.
 - Do not run `npm install` from WSL and then try to use the resulting `node_modules` from PowerShell. Reinstall in the shell you plan to use.
 - This repo is not a root-level Node workspace. Do not create a root `package-lock.json`.
 

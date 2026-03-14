@@ -2,19 +2,40 @@
 
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { fetchDashboard, uploadSyllabus } from "./api";
 import type { DashboardResponse, ParseResponse, ScheduleBlock, SocialPocket } from "./types";
 
+type PageView = "home" | "schedule";
+
+type ManagedAssignment = {
+  id: string;
+  title: string;
+  historicalHours: number;
+};
+
+type ManagedClass = {
+  id: string;
+  name: string;
+  code: string;
+  assignments: ManagedAssignment[];
+  syllabusFileName?: string;
+};
+
+type TimeBlockDraft = {
+  label: string;
+  start: string;
+  end: string;
+};
+
+const storySteps = [
+  "See the pressure clearly",
+  "Spot the social opening",
+  "Reweave the day",
+];
+
 function formatTime(value: string): string {
   return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function formatDueDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
@@ -39,16 +60,26 @@ function blockTone(type: ScheduleBlock["block_type"]): string {
       return "block social";
     case "meal":
       return "block meal";
+    case "buffer":
+      return "block buffer";
     default:
       return "block class";
   }
 }
 
+function toDateTimeLocal(value: string): string {
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset();
+  const adjusted = new Date(date.getTime() - offset * 60_000);
+  return adjusted.toISOString().slice(0, 16);
+}
+
 function buildFateweaverStrategies(
   dashboard: DashboardResponse,
   targetPocket: SocialPocket | null,
+  draftedBlock: TimeBlockDraft | null,
 ): string[] {
-  const targetLabel = targetPocket?.title ?? "this window";
+  const targetLabel = draftedBlock?.label || targetPocket?.title || "this window";
   const strategies: string[] = [];
   const sprintMinutes = Math.min(Math.max(Math.round(dashboard.shuffle_plan.unlocked_minutes / 2), 20), 30);
 
@@ -57,7 +88,7 @@ function buildFateweaverStrategies(
   );
   if (readingAssignment) {
     strategies.push(
-      `Do ${readingAssignment.title} in focused skim mode and extract only discussion-critical points. That keeps ${targetLabel} reachable.`,
+      `Compress ${readingAssignment.title} into a discussion-only pass so ${targetLabel} stays claimable.`,
     );
   }
 
@@ -68,7 +99,7 @@ function buildFateweaverStrategies(
   );
   if (problemSetAssignment) {
     strategies.push(
-      `Start ${problemSetAssignment.title} with the fastest wins first so you secure visible progress before you leave.`,
+      `Front-load the fastest wins in ${problemSetAssignment.title} before you leave so the day still feels under control.`,
     );
   }
 
@@ -77,42 +108,109 @@ function buildFateweaverStrategies(
   );
   if (laterWorkBlock) {
     strategies.push(
-      `Move ${laterWorkBlock.label} into the quieter later block and protect the next clean sprint for ${targetLabel}.`,
+      `Push ${laterWorkBlock.label} into the quieter late block and protect the cleanest hour for ${targetLabel}.`,
     );
   }
 
   if (strategies.length < 3) {
     strategies.push(
-      `Use a ${sprintMinutes}-minute distraction-free sprint now. Fateweaver Protocol only needs one clean burst to unlock ${targetLabel}.`,
-    );
-  }
-
-  if (strategies.length < 3) {
-    strategies.push(
-      `Aim for a good-enough pass before this window, then revise later tonight once the opportunity is secured.`,
+      `Run a ${sprintMinutes}-minute distraction-free sprint now. Fateweaver Protocol only needs one clean burst to unlock ${targetLabel}.`,
     );
   }
 
   return strategies.slice(0, 3);
 }
 
-function ScheduleCanvas({
-  blocks,
+function buildManagedClasses(dashboard: DashboardResponse): ManagedClass[] {
+  return [
+    {
+      id: "seeded-course",
+      code: dashboard.course.code,
+      name: dashboard.course.title,
+      assignments: dashboard.assignments.map((assignment) => ({
+        id: assignment.id,
+        title: assignment.title,
+        historicalHours: Number(assignment.base_effort_hours.toFixed(1)),
+      })),
+    },
+  ];
+}
+
+function buildOptimizedBlocks(
+  dashboard: DashboardResponse,
+  draftedBlock: TimeBlockDraft | null,
+  showOptimized: boolean,
+): ScheduleBlock[] {
+  const sourceBlocks = showOptimized
+    ? dashboard.shuffle_plan.after_blocks
+    : dashboard.shuffle_plan.before_blocks;
+
+  if (!draftedBlock || !showOptimized) {
+    return sourceBlocks;
+  }
+
+  const customBlock: ScheduleBlock = {
+    id: "custom-timeblock",
+    label: draftedBlock.label,
+    block_type: "social",
+    start_at: new Date(draftedBlock.start).toISOString(),
+    end_at: new Date(draftedBlock.end).toISOString(),
+    movable: false,
+    intensity: 0.78,
+  };
+
+  return [...sourceBlocks, customBlock].sort(
+    (left, right) => new Date(left.start_at).getTime() - new Date(right.start_at).getTime(),
+  );
+}
+
+function Modal({
+  open,
   title,
+  onClose,
+  children,
 }: {
-  blocks: ScheduleBlock[];
+  open: boolean;
   title: string;
+  onClose: () => void;
+  children: ReactNode;
 }) {
   return (
-    <div className="schedule-panel">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Fateweaver Protocol</p>
-          <h3>{title}</h3>
-        </div>
-        <p className="muted">8 AM to 10 PM</p>
-      </div>
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          className="modal-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="modal-shell"
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow">KAIROS</p>
+                <h3>{title}</h3>
+              </div>
+              <button className="ghost-button" onClick={onClose} type="button">
+                Close
+              </button>
+            </div>
+            {children}
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
 
+function ScheduleCanvas({ blocks }: { blocks: ScheduleBlock[] }) {
+  return (
+    <div className="schedule-panel">
       <div className="schedule-grid">
         {Array.from({ length: 8 }, (_, index) => 8 + index * 2).map((hour) => (
           <div className="schedule-tick" key={hour}>
@@ -128,8 +226,8 @@ function ScheduleCanvas({
               transition={{ type: "spring", stiffness: 220, damping: 26 }}
               className={blockTone(block.block_type)}
               style={{
-                top: `${minuteOffset(block.start_at) * 1.18}px`,
-                height: `${blockHeight(block.start_at, block.end_at) * 1.18}px`,
+                top: `${minuteOffset(block.start_at) * 1.12}px`,
+                height: `${blockHeight(block.start_at, block.end_at) * 1.12}px`,
               }}
             >
               <div className="block-topline">
@@ -148,21 +246,28 @@ function ScheduleCanvas({
   );
 }
 
-const storyLabels = [
-  "Ingest syllabus",
-  "Price the work debt",
-  "Spot a social window",
-  "Run Fateweaver Protocol",
-];
-
 export default function App() {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
-  const [parseResult, setParseResult] = useState<ParseResponse | null>(null);
+  const [managedClasses, setManagedClasses] = useState<ManagedClass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
-  const [showShuffled, setShowShuffled] = useState(false);
+  const [isUploading, setIsUploading] = useState<string | null>(null);
+  const [showOptimized, setShowOptimized] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [storyStep, setStoryStep] = useState(0);
+  const [pageView, setPageView] = useState<PageView>("home");
+  const [showFriends, setShowFriends] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAddClassModal, setShowAddClassModal] = useState(false);
+  const [showTimeBlockModal, setShowTimeBlockModal] = useState(false);
+  const [parseResult, setParseResult] = useState<ParseResponse | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [newClassName, setNewClassName] = useState("");
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { title: string; historicalHours: string }>>({});
+  const [timeBlockDraft, setTimeBlockDraft] = useState<TimeBlockDraft | null>(null);
+  const [timeBlockForm, setTimeBlockForm] = useState<TimeBlockDraft>({
+    label: "Slope sunset window",
+    start: "",
+    end: "",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -172,6 +277,15 @@ export default function App() {
         const response = await fetchDashboard();
         if (!cancelled) {
           setDashboard(response);
+          setManagedClasses(buildManagedClasses(response));
+          const targetPocket = response.pockets[0];
+          if (targetPocket) {
+            setTimeBlockForm({
+              label: targetPocket.title,
+              start: toDateTimeLocal(targetPocket.start_at),
+              end: toDateTimeLocal(targetPocket.end_at),
+            });
+          }
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -190,47 +304,122 @@ export default function App() {
     };
   }, []);
 
-  const scheduleBlocks = useMemo(() => {
+  const topPocket = dashboard?.pockets[0] ?? null;
+  const optimizedBlocks = useMemo(() => {
     if (!dashboard) {
       return [];
     }
 
-    return showShuffled ? dashboard.shuffle_plan.after_blocks : dashboard.shuffle_plan.before_blocks;
-  }, [dashboard, showShuffled]);
+    return buildOptimizedBlocks(dashboard, timeBlockDraft, showOptimized);
+  }, [dashboard, showOptimized, timeBlockDraft]);
 
-  const topPocket = dashboard?.pockets[0] ?? null;
   const fateweaverStrategies = useMemo(() => {
     if (!dashboard) {
       return [];
     }
 
-    return buildFateweaverStrategies(dashboard, topPocket);
-  }, [dashboard, topPocket]);
+    return buildFateweaverStrategies(dashboard, topPocket, timeBlockDraft);
+  }, [dashboard, topPocket, timeBlockDraft]);
 
-  function playDemoStory() {
-    setStoryStep(0);
-    setShowShuffled(false);
-    window.setTimeout(() => setStoryStep(1), 500);
-    window.setTimeout(() => setStoryStep(2), 1100);
-    window.setTimeout(() => {
-      setStoryStep(3);
-      setShowShuffled(true);
-    }, 1800);
-  }
+  const selectedClass = managedClasses.find((course) => course.id === selectedClassId) ?? managedClasses[0] ?? null;
+  const connectedFriends = dashboard?.friends.flatMap((friend) => friend.windows.map((window) => ({
+    id: `${friend.friend_id}-${window.start_at}`,
+    name: friend.friend_name,
+    startAt: window.start_at,
+    endAt: window.end_at,
+    locationHint: window.location_hint,
+  }))) ?? [];
 
-  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
+  function addClass() {
+    if (!newClassName.trim()) {
       return;
     }
 
-    setIsUploading(true);
+    const generatedCode = `COURSE ${managedClasses.length + 1}`;
+    const newClass: ManagedClass = {
+      id: `class-${Date.now()}`,
+      name: newClassName.trim(),
+      code: generatedCode,
+      assignments: [],
+    };
+
+    setManagedClasses((current) => [newClass, ...current]);
+    setSelectedClassId(newClass.id);
+    setNewClassName("");
+    setShowAddClassModal(false);
+  }
+
+  function updateAssignmentDraft(
+    classId: string,
+    field: "title" | "historicalHours",
+    value: string,
+  ) {
+    setAssignmentDrafts((current) => ({
+      ...current,
+      [classId]: {
+        title: current[classId]?.title ?? "",
+        historicalHours: current[classId]?.historicalHours ?? "",
+        [field]: value,
+      },
+    }));
+  }
+
+  function addAssignment(classId: string) {
+    const draft = assignmentDrafts[classId];
+    if (!draft?.title.trim() || !draft.historicalHours.trim()) {
+      return;
+    }
+
+    setManagedClasses((current) =>
+      current.map((course) =>
+        course.id === classId
+          ? {
+              ...course,
+              assignments: [
+                ...course.assignments,
+                {
+                  id: `assignment-${Date.now()}`,
+                  title: draft.title.trim(),
+                  historicalHours: Number(draft.historicalHours),
+                },
+              ],
+            }
+          : course,
+      ),
+    );
+
+    setAssignmentDrafts((current) => ({
+      ...current,
+      [classId]: { title: "", historicalHours: "" },
+    }));
+  }
+
+  async function handleSyllabusUpload(classId: string, file: File) {
+    setIsUploading(classId);
     setError(null);
 
     try {
       const response = await uploadSyllabus(file);
       setParseResult(response);
-      setStoryStep(1);
+
+      setManagedClasses((current) =>
+        current.map((course) =>
+          course.id === classId
+            ? {
+                ...course,
+                name: response.course.title,
+                code: response.course.code,
+                syllabusFileName: file.name,
+                assignments: response.assignments.map((assignment) => ({
+                  id: assignment.id,
+                  title: assignment.title,
+                  historicalHours: Number(assignment.base_effort_hours.toFixed(1)),
+                })),
+              }
+            : course,
+        ),
+      );
+
       setDashboard((current) =>
         current
           ? {
@@ -244,9 +433,14 @@ export default function App() {
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Upload failed");
     } finally {
-      setIsUploading(false);
-      event.target.value = "";
+      setIsUploading(null);
     }
+  }
+
+  function runFateweaver() {
+    setShowOptimized(true);
+    setTimeBlockDraft(timeBlockForm);
+    setPageView("schedule");
   }
 
   if (isLoading) {
@@ -257,305 +451,434 @@ export default function App() {
     return <div className="screen-state">Unable to load the MVP: {error}</div>;
   }
 
+  const highlightedFriend = topPocket?.friend_names.slice(0, 3).join(" · ") ?? "Your Cornell circle";
+
   return (
     <div className="app-shell">
       <div className="background-orb background-orb-left" />
       <div className="background-orb background-orb-right" />
 
-      <motion.header
-        className="hero"
-        initial={{ opacity: 0, y: 28 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.65 }}
-      >
-        <div className="hero-copy">
-          <p className="eyebrow">KAIROS / Cornell life arbitrage</p>
-          <h1>Live the life you planned, not the one you fell into.</h1>
-          <p className="hero-text">
-            KAIROS turns academic pressure, friend availability, and idle drift into
-            Fateweaver Protocol: a system that rewrites flexible work around the moments
-            worth saving.
-          </p>
-
-          <div className="hero-actions">
-            <button className="primary-button" onClick={() => setShowShuffled((value) => !value)}>
-              {showShuffled ? "Show original day" : "Trigger Fateweaver Protocol"}
-            </button>
-            <button className="secondary-button" onClick={playDemoStory}>
-              Play demo story
-            </button>
-            <label className="upload-button">
-              {isUploading ? "Parsing syllabus..." : "Upload syllabus"}
-              <input type="file" accept=".pdf,.txt,.doc,.docx" onChange={handleUpload} hidden />
-            </label>
-          </div>
-
-          <div className="hero-metrics">
-            <div>
-              <span>Work Debt</span>
-              <strong>{dashboard.ledger.work_debt_score}</strong>
-            </div>
-            <div>
-              <span>Recovered window</span>
-              <strong>{dashboard.shuffle_plan.unlocked_minutes} mins</strong>
-            </div>
-            <div>
-              <span>Friends aligned</span>
-              <strong>{topPocket?.friend_names.length ?? 0}</strong>
-            </div>
-            <div>
-              <span>Social readiness</span>
-              <strong>{dashboard.social_readiness.score}%</strong>
-            </div>
-          </div>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">KAIROS / Cornell life operating system</p>
+          <strong className="brand-lockup">Fateweaver-first student operating system</strong>
         </div>
+        <button className="secondary-button" onClick={() => setShowAuthModal(true)} type="button">
+          Sign Up / Login
+        </button>
+      </header>
 
-        <motion.div
-          className="hero-card"
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.55, delay: 0.12 }}
+      <nav className="page-switcher">
+        <button
+          className={pageView === "home" ? "switch-pill active" : "switch-pill"}
+          onClick={() => setPageView("home")}
+          type="button"
         >
-          <div className="hero-card-top">
-            <span className="badge">Fateweaver engine</span>
-            <span>{dashboard.course.code}</span>
-          </div>
-          <h2>{topPocket?.title ?? dashboard.idle_alert.headline}</h2>
-          <p>{topPocket?.emotional_hook ?? dashboard.idle_alert.action}</p>
-          <div className="hero-context">
-            <span>{dashboard.weather.temperature_f}F</span>
-            <span>{dashboard.weather.summary}</span>
-            <span>{topPocket?.location_hint ?? "Cornell campus"}</span>
-          </div>
-          <div className="friend-row">
-            {(topPocket?.friend_names ?? dashboard.idle_alert.friend_names).map((name) => (
-              <span key={name}>{name}</span>
-            ))}
-          </div>
-        </motion.div>
-      </motion.header>
+          Page 1
+        </button>
+        <button
+          className={pageView === "schedule" ? "switch-pill active" : "switch-pill"}
+          onClick={() => setPageView("schedule")}
+          type="button"
+        >
+          Page 2
+        </button>
+      </nav>
 
-      <section className="story-rail">
-        {storyLabels.map((label, index) => {
-          const status =
-            index < storyStep ? "complete" : index === storyStep ? "active" : "pending";
-          return (
-            <div className={`story-step ${status}`} key={label}>
-              <span>{index + 1}</span>
-              <strong>{label}</strong>
-            </div>
-          );
-        })}
-      </section>
-
-      <main className="dashboard">
-        <section className="dashboard-grid">
-          <motion.article
-            className={`card debt-card ${storyStep === 1 ? "active-card" : ""}`}
-            initial={{ opacity: 0, y: 28 }}
+      <AnimatePresence mode="wait">
+        {pageView === "home" ? (
+          <motion.main
+            key="home"
+            className="page-grid"
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.1 }}
+            exit={{ opacity: 0, y: -18 }}
+            transition={{ duration: 0.35 }}
           >
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Work Debt Ledger</p>
-                <h3>{dashboard.ledger.work_debt_score} debt points</h3>
-              </div>
-              <span className="badge warm">{dashboard.ledger.interest_drag_hours}h lost to delay</span>
-            </div>
+            <section className="hero-panel">
+              <p className="eyebrow">Front page</p>
+              <h1>Live the life you planned, not the one you fell into.</h1>
+              <p className="hero-text">
+                KAIROS maps classes, assignment drag, friend overlap, and campus momentum into
+                Fateweaver Protocol so a better version of the day is always one move away.
+              </p>
 
-            <div className="meter-track">
-              <motion.div
-                className="meter-fill"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(dashboard.ledger.work_debt_score, 100)}%` }}
-                transition={{ duration: 0.7, delay: 0.2 }}
-              />
-            </div>
-
-            <div className="mini-stats">
-              <div>
-                <span>Total academic load</span>
-                <strong>{dashboard.ledger.total_hours} hrs</strong>
-              </div>
-              <div>
-                <span>Focus needed today</span>
-                <strong>{dashboard.ledger.focus_hours_today} hrs</strong>
-              </div>
-            </div>
-
-            <p className="card-copy">{dashboard.ledger.summary}</p>
-
-            <div className="assignment-list">
-              {dashboard.ledger.items.map((item) => (
-                <div key={item.assignment_id} className="assignment-row">
-                  <div>
-                    <strong>{item.title}</strong>
-                    <span>
-                      due {formatDueDate(item.due_at)} / {item.adjusted_effort_hours.toFixed(1)}h adjusted
-                    </span>
-                  </div>
-                  <span>{item.interest_multiplier.toFixed(2)}x urgency</span>
-                </div>
-              ))}
-            </div>
-          </motion.article>
-
-          <motion.article
-            className={`card schedule-card ${storyStep === 3 ? "active-card" : ""}`}
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.16 }}
-          >
-            <ScheduleCanvas
-              blocks={scheduleBlocks}
-              title={showShuffled ? "Rewoven day" : "Original day plan"}
-            />
-            <div className="shuffle-footer">
-              <div>
-                <p className="eyebrow">Rewritten tradeoff</p>
-                <h3>{dashboard.shuffle_plan.tradeoff_statement}</h3>
-              </div>
-              <button className="secondary-button" onClick={() => setShowShuffled((value) => !value)}>
-                {showShuffled ? "Show original day" : "Run Fateweaver Protocol"}
-              </button>
-            </div>
-            <div className="strategy-panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">AI tactics</p>
-                  <h3>How Fateweaver makes this window believable</h3>
-                </div>
-                <span className="badge">Window-specific</span>
-              </div>
-              <div className="strategy-list">
-                {fateweaverStrategies.map((strategy) => (
-                  <div className="strategy-item" key={strategy}>
-                    <span className="strategy-index">Protocol</span>
-                    <p>{strategy}</p>
-                  </div>
+              <div className="story-ribbon">
+                {storySteps.map((step, index) => (
+                  <motion.div
+                    animate={{ opacity: 1, y: 0 }}
+                    className="story-node"
+                    initial={{ opacity: 0, y: 14 }}
+                    key={step}
+                    transition={{ delay: index * 0.12 + 0.08, duration: 0.28 }}
+                  >
+                    <span>{index + 1}</span>
+                    <strong>{step}</strong>
+                  </motion.div>
                 ))}
               </div>
-            </div>
-          </motion.article>
-        </section>
 
-        <section className="lower-grid">
-          <motion.article
-            className={`card ${storyStep === 2 ? "active-card" : ""}`}
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.24 }}
-          >
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Social Gravity</p>
-                <h3>Claimable micro-pockets</h3>
+              <div className="hero-actions">
+                <button className="primary-button" onClick={() => setShowFriends((value) => !value)} type="button">
+                  {showFriends ? "Hide connected friends" : "Show connected friends"}
+                </button>
+                <button className="secondary-button" onClick={() => setShowAddClassModal(true)} type="button">
+                  Add class
+                </button>
               </div>
-              <span className="badge">{dashboard.pockets.length} live windows</span>
-            </div>
 
-            <div className="pocket-list">
-              {dashboard.pockets.map((pocket) => (
-                <motion.div
-                  className="pocket-card"
-                  key={pocket.id}
-                  whileHover={{ y: -4 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                >
-                  <div className="pocket-meta">
-                    <strong>{pocket.title}</strong>
-                    <span>{pocket.claimability} claimability</span>
-                  </div>
-                  <p>
-                    {formatTime(pocket.start_at)} to {formatTime(pocket.end_at)} · {pocket.location_hint}
-                  </p>
-                  <p>
-                    {pocket.weather_label} · {pocket.day_phase}
-                  </p>
-                  <div className="friend-row">
-                    {pocket.friend_names.map((name) => (
-                      <span key={name}>{name}</span>
-                    ))}
-                  </div>
-                  <p className="card-copy">{pocket.why_now}</p>
-                  <p className="card-copy pocket-hook">{pocket.emotional_hook}</p>
-                </motion.div>
-              ))}
-            </div>
-          </motion.article>
+              <div className="hero-metrics">
+                <div>
+                  <span>Debt hours</span>
+                  <strong>{dashboard.ledger.interest_drag_hours}h</strong>
+                </div>
+                <div>
+                  <span>Work debt</span>
+                  <strong>{dashboard.ledger.work_debt_score}</strong>
+                </div>
+                <div>
+                  <span>Friends aligned</span>
+                  <strong>{topPocket?.friend_names.length ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Recovered window</span>
+                  <strong>{dashboard.shuffle_plan.unlocked_minutes} min</strong>
+                </div>
+              </div>
 
-          <motion.article
-            className="card intervention-card"
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.32 }}
-          >
-            <p className="eyebrow">Idle intervention</p>
-            <AnimatePresence mode="wait">
               <motion.div
-                key={showShuffled ? "open" : "closed"}
-                initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -18 }}
-                transition={{ duration: 0.3 }}
+                className="fateweaver-preview"
+                initial={{ opacity: 0, y: 18 }}
+                transition={{ delay: 0.18, duration: 0.35 }}
               >
-                <h3>{dashboard.idle_alert.headline}</h3>
-                <p className="card-copy">{dashboard.idle_alert.action}</p>
-                <div className="mini-stats">
-                  <div>
-                    <span>Social readiness gap</span>
-                    <strong>{dashboard.idle_alert.social_readiness_gap_hours} hrs</strong>
-                  </div>
-                  <div>
-                    <span>Best move now</span>
-                    <strong>{showShuffled ? "Leave for the Slope" : "Sprint first"}</strong>
-                  </div>
-                  <div>
-                    <span>Social readiness</span>
-                    <strong>{dashboard.social_readiness.score}%</strong>
-                  </div>
+                <div className="preview-topline">
+                  <span className="badge">Fateweaver spotlight</span>
+                  <span className="preview-score">{dashboard.social_readiness.score}% ready</span>
+                </div>
+                <h3>{timeBlockDraft?.label ?? topPocket?.title ?? "A reclaimable Cornell window"}</h3>
+                <p>
+                  {topPocket?.emotional_hook ??
+                    "A sharp rewrite turns pressure into a night that still feels worth remembering."}
+                </p>
+                <div className="preview-meta">
+                  <span>{highlightedFriend}</span>
+                  <span>{topPocket?.location_hint ?? "Libe Slope"}</span>
+                  <span>{dashboard.weather.summary}</span>
                 </div>
               </motion.div>
-            </AnimatePresence>
 
-            <div className="social-readiness-panel">
-              <p className="eyebrow">Social Readiness</p>
-              <h3>
-                {dashboard.social_readiness.status === "behind"
-                  ? `${dashboard.social_readiness.gap_hours} hours short this week`
-                  : "On track for a balanced week"}
-              </h3>
-              <p className="card-copy">{dashboard.social_readiness.summary}</p>
-            </div>
+              <AnimatePresence>
+                {showFriends ? (
+                  <motion.div
+                    className="friends-panel"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                  >
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">Connected network</p>
+                        <h3>Friends attached to your schedule</h3>
+                      </div>
+                      <span className="badge">{connectedFriends.length} windows</span>
+                    </div>
+                    <div className="friend-grid">
+                      {connectedFriends.map((friend) => (
+                        <div className="friend-card" key={friend.id}>
+                          <strong>{friend.name}</strong>
+                          <span>
+                            {formatTime(friend.startAt)} to {formatTime(friend.endAt)}
+                          </span>
+                          <p>{friend.locationHint}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </section>
 
-            <div className="assumptions">
-              <div>
-                <span>Reading speed</span>
-                <strong>{dashboard.assumptions.reading_speed_pph} pph</strong>
+            <section className="classes-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Classes</p>
+                  <h3>Add classes, assignments, and syllabus uploads</h3>
+                </div>
+                <span className="badge warm">{managedClasses.length} tracked</span>
               </div>
-              <div>
-                <span>Major difficulty</span>
-                <strong>{dashboard.assumptions.major_difficulty_multiplier.toFixed(2)}x</strong>
-              </div>
-              <div>
-                <span>Historical pace</span>
-                <strong>{dashboard.assumptions.historical_productivity_multiplier.toFixed(2)}x</strong>
-              </div>
-            </div>
 
-            {parseResult ? (
-              <div className="upload-result">
-                <span className="badge warm">{parseResult.parser_mode}</span>
-                <strong>
-                  Parsed {parseResult.course.code}: {parseResult.course.title}
-                </strong>
-                <p>{parseResult.notes}</p>
+              <div className="class-rail">
+                <div>
+                  <span>Primary course</span>
+                  <strong>{dashboard.course.code}</strong>
+                </div>
+                <div>
+                  <span>Assignments loaded</span>
+                  <strong>{dashboard.assignments.length}</strong>
+                </div>
+                <div>
+                  <span>Protocol target</span>
+                  <strong>{topPocket?.claimability ?? "Live"}</strong>
+                </div>
               </div>
-            ) : null}
-          </motion.article>
-        </section>
-      </main>
+
+              <div className="class-grid">
+                <aside className="class-list">
+                  {managedClasses.map((course) => (
+                    <button
+                      className={selectedClass?.id === course.id ? "class-list-item active" : "class-list-item"}
+                      key={course.id}
+                      onClick={() => setSelectedClassId(course.id)}
+                      type="button"
+                    >
+                      <strong>{course.code}</strong>
+                      <span>{course.name}</span>
+                    </button>
+                  ))}
+                </aside>
+
+                {selectedClass ? (
+                  <div className="class-detail">
+                    <div className="class-summary">
+                      <div>
+                        <p className="eyebrow">Selected class</p>
+                        <h3>
+                          {selectedClass.code}: {selectedClass.name}
+                        </h3>
+                      </div>
+                      <label className="upload-button">
+                        {isUploading === selectedClass.id ? "Uploading syllabus..." : "Upload syllabus"}
+                        <input
+                          accept=".pdf,.txt,.doc,.docx"
+                          hidden
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) {
+                              void handleSyllabusUpload(selectedClass.id, file);
+                            }
+                            event.target.value = "";
+                          }}
+                          type="file"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="syllabus-meta">
+                      <span>{selectedClass.syllabusFileName ?? "No syllabus uploaded yet"}</span>
+                    </div>
+
+                    <div className="assignment-form">
+                      <input
+                        onChange={(event) =>
+                          updateAssignmentDraft(selectedClass.id, "title", event.target.value)
+                        }
+                        placeholder="Assignment title"
+                        type="text"
+                        value={assignmentDrafts[selectedClass.id]?.title ?? ""}
+                      />
+                      <input
+                        min="0"
+                        onChange={(event) =>
+                          updateAssignmentDraft(selectedClass.id, "historicalHours", event.target.value)
+                        }
+                        placeholder="Historical hours"
+                        step="0.5"
+                        type="number"
+                        value={assignmentDrafts[selectedClass.id]?.historicalHours ?? ""}
+                      />
+                      <button className="primary-button" onClick={() => addAssignment(selectedClass.id)} type="button">
+                        Add assignment
+                      </button>
+                    </div>
+
+                    <div className="assignment-stack">
+                      {selectedClass.assignments.map((assignment) => (
+                        <div className="assignment-card" key={assignment.id}>
+                          <div>
+                            <strong>{assignment.title}</strong>
+                            <span>Historical completion time</span>
+                          </div>
+                          <strong>{assignment.historicalHours} hrs</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          </motion.main>
+        ) : (
+          <motion.main
+            key="schedule"
+            className="schedule-page"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -18 }}
+            transition={{ duration: 0.35 }}
+          >
+            <section className="schedule-shell">
+              <div className="schedule-main">
+                <div className="panel-heading schedule-header">
+                  <div>
+                    <p className="eyebrow">Page 2</p>
+                    <h2>Reweave the day around a time block worth claiming</h2>
+                  </div>
+                  <div className="schedule-actions">
+                    <button className="secondary-button" onClick={() => setShowTimeBlockModal(true)} type="button">
+                      Add time block
+                    </button>
+                    <button className="primary-button" onClick={runFateweaver} type="button">
+                      Fateweaver Protocol
+                    </button>
+                  </div>
+                </div>
+
+                <div className="timeblock-banner">
+                  <strong>{timeBlockDraft?.label ?? topPocket?.title ?? "No custom time block selected"}</strong>
+                  <span>
+                    {timeBlockDraft
+                      ? `${formatTime(new Date(timeBlockDraft.start).toISOString())} to ${formatTime(new Date(timeBlockDraft.end).toISOString())}`
+                      : topPocket
+                        ? `${formatTime(topPocket.start_at)} to ${formatTime(topPocket.end_at)}`
+                        : "Add a block to direct the rewrite"}
+                  </span>
+                </div>
+
+                <div className="schedule-layout">
+                  <motion.div
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="schedule-stage"
+                    initial={{ opacity: 0, scale: 0.985 }}
+                    transition={{ duration: 0.28 }}
+                  >
+                    <ScheduleCanvas blocks={optimizedBlocks} />
+                  </motion.div>
+
+                  <aside className="schedule-sidebar">
+                    <div className="card">
+                      <div className="panel-heading">
+                        <div>
+                          <p className="eyebrow">Rewoven logic</p>
+                          <h3>{dashboard.shuffle_plan.tradeoff_statement}</h3>
+                        </div>
+                        <span className="badge">{showOptimized ? "Optimized" : "Original"}</span>
+                      </div>
+                      <div className="strategy-list">
+                        {fateweaverStrategies.map((strategy) => (
+                          <div className="strategy-item" key={strategy}>
+                            <span className="strategy-index">Protocol</span>
+                            <p>{strategy}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+
+              <aside className="stats-dock">
+                <div className="card debt-card">
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">Bottom-left stats</p>
+                      <h3>{dashboard.ledger.interest_drag_hours} debt hours</h3>
+                    </div>
+                    <span className="badge warm">{dashboard.ledger.work_debt_score} score</span>
+                  </div>
+                  <div className="meter-track">
+                    <motion.div
+                      animate={{ width: `${Math.min(dashboard.ledger.work_debt_score, 100)}%` }}
+                      className="meter-fill"
+                      initial={{ width: 0 }}
+                      transition={{ duration: 0.7 }}
+                    />
+                  </div>
+                  <div className="mini-stats">
+                    <div>
+                      <span>Total load</span>
+                      <strong>{dashboard.ledger.total_hours} hrs</strong>
+                    </div>
+                    <div>
+                      <span>Focus today</span>
+                      <strong>{dashboard.ledger.focus_hours_today} hrs</strong>
+                    </div>
+                    <div>
+                      <span>Readiness</span>
+                      <strong>{dashboard.social_readiness.score}%</strong>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </section>
+          </motion.main>
+        )}
+      </AnimatePresence>
+
+      <Modal onClose={() => setShowAuthModal(false)} open={showAuthModal} title="Sign up or log in">
+        <div className="modal-form">
+          <input placeholder="Cornell email" type="email" />
+          <input placeholder="Password" type="password" />
+          <button className="primary-button" type="button">
+            Continue
+          </button>
+        </div>
+      </Modal>
+
+      <Modal onClose={() => setShowAddClassModal(false)} open={showAddClassModal} title="Add a class">
+        <div className="modal-form">
+          <input
+            onChange={(event) => setNewClassName(event.target.value)}
+            placeholder="Class name"
+            type="text"
+            value={newClassName}
+          />
+          <button className="primary-button" onClick={addClass} type="button">
+            Save class
+          </button>
+        </div>
+      </Modal>
+
+      <Modal onClose={() => setShowTimeBlockModal(false)} open={showTimeBlockModal} title="Add a target time block">
+        <div className="modal-form">
+          <input
+            onChange={(event) => setTimeBlockForm((current) => ({ ...current, label: event.target.value }))}
+            placeholder="Time block name"
+            type="text"
+            value={timeBlockForm.label}
+          />
+          <input
+            onChange={(event) => setTimeBlockForm((current) => ({ ...current, start: event.target.value }))}
+            type="datetime-local"
+            value={timeBlockForm.start}
+          />
+          <input
+            onChange={(event) => setTimeBlockForm((current) => ({ ...current, end: event.target.value }))}
+            type="datetime-local"
+            value={timeBlockForm.end}
+          />
+          <button
+            className="primary-button"
+            onClick={() => {
+              setTimeBlockDraft(timeBlockForm);
+              setShowTimeBlockModal(false);
+            }}
+            type="button"
+          >
+            Use time block
+          </button>
+        </div>
+      </Modal>
+
+      {parseResult ? (
+        <div className="parse-toast">
+          <span className="badge warm">{parseResult.parser_mode}</span>
+          <strong>
+            Parsed {parseResult.course.code}: {parseResult.course.title}
+          </strong>
+          <p>{parseResult.notes}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
