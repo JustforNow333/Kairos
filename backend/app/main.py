@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import FastAPI, UploadFile, File, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -39,7 +40,7 @@ from .auth import oauth
 app = FastAPI(title="KAIROS Engine", version="0.1.0")
 
 # Add SessionMiddleware (required by authlib for state verification)
-app.add_middleware(SessionMiddleware, secret_key="super-secret-kairos-key")
+app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 
 app.add_middleware(
     CORSMiddleware,
@@ -104,7 +105,7 @@ def dashboard_overview(request: Request) -> DashboardResponse:
 @app.post("/api/v1/syllabus/parse")
 async def syllabus_parse(file: UploadFile = File(...)):
     response = parse_syllabus(filename=file.filename, file_bytes=await file.read())
-    replace_assignments(response.course, response.assignments)
+    replace_assignments(DEMO_USER_ID, response.course, response.assignments)
     return response
 
 
@@ -124,11 +125,8 @@ def update_assumptions(assumptions: UserAssumptions):
 
 @app.get("/api/v1/auth/google/login")
 async def google_login(request: Request):
-    redirect_uri = "http://localhost:8000/api/auth/callback"
+    redirect_uri = str(request.url_for("google_auth_callback"))
     return await oauth.google.authorize_redirect(request, redirect_uri, access_type="offline", prompt="consent")
-
-from fastapi.responses import RedirectResponse
-import time
 
 @app.get("/api/auth/callback")
 async def google_auth_callback(request: Request):

@@ -40,6 +40,8 @@ npm run dev
 Vercel deployment:
 - Deploy the Next.js app from `frontend/`, or keep the repo root and use the included [vercel.json](/mnt/c/Kairos/vercel.json).
 - Set `NEXT_PUBLIC_API_BASE_URL` in Vercel to your deployed backend URL.
+- The FastAPI backend is exposed for Vercel at [api/index.py](/mnt/c/Kairos/api/index.py).
+- For persistent backend storage on Vercel, set `DATABASE_URL` to a Postgres database; local SQLite is not persistent on Vercel.
 
 One-command Windows frontend startup from the repo root:
 
