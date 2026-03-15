@@ -68,6 +68,7 @@ cd frontend && npm run build
 ### Vercel deployment
 
 - Deploy the frontend and backend as two separate Vercel projects from the same repo.
+- Do not keep or rely on a root-level `vercel.json` for the split Vercel setup.
 - Set the frontend Root Directory to `frontend`.
 - Set the backend Root Directory to `backend`.
 - The backend Vercel entrypoint is `backend/api/index.py`.

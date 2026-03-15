@@ -60,6 +60,8 @@ cd frontend && npm run build
 
 Deploy this repo to Vercel as two separate projects from the same Git repository.
 
+Do not use a root-level `vercel.json` or deploy the repository root as a single Vercel project for this setup.
+
 ### Frontend project
 
 - Root Directory: `frontend`
