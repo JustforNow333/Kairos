@@ -27,6 +27,7 @@ from .db import (
 from .schemas import DashboardResponse, IdleAlertRequest, ShuffleRequest, SocialPocketRequest, UserAssumptions
 from .services.parser import parse_syllabus
 from .services.weather import fetch_live_weather
+from .services.fateweaver import build_fateweaver_tactics
 from .services.scheduler import (
     build_idle_alert,
     build_shuffle_plan,
@@ -96,6 +97,9 @@ def dashboard_overview(request: Request) -> DashboardResponse:
     ledger = build_work_debt_ledger(assignments, assumptions)
     social_readiness = build_social_readiness(current_schedule, pockets, assumptions)
     shuffle_plan = build_shuffle_plan(current_schedule, pockets)
+    target_pocket = next((pocket for pocket in pockets if pocket.id == shuffle_plan.target_pocket_id), None)
+    tactics, strategy_source = build_fateweaver_tactics(assignments, shuffle_plan, target_pocket)
+    shuffle_plan = shuffle_plan.model_copy(update={"tactics": tactics, "strategy_source": strategy_source})
     idle_alert = build_idle_alert(idle_event=idle_event, pockets=pockets, assumptions=assumptions, social_readiness=social_readiness)
 
     return DashboardResponse(
@@ -200,7 +204,10 @@ def sync_calendar(request: Request):
 
 @app.post("/api/v1/shuffle/plan")
 def shuffle_plan(request: ShuffleRequest):
-    return build_shuffle_plan(request.schedule, request.pockets)
+    plan = build_shuffle_plan(request.schedule, request.pockets)
+    target_pocket = next((pocket for pocket in request.pockets if pocket.id == plan.target_pocket_id), None)
+    tactics, strategy_source = build_fateweaver_tactics([], plan, target_pocket)
+    return plan.model_copy(update={"tactics": tactics, "strategy_source": strategy_source})
 
 
 @app.post("/api/v1/idle")

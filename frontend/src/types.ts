@@ -78,6 +78,8 @@ export type ShufflePlan = {
   tradeoff_statement: string;
   focus_boost_multiplier: number;
   unlocked_minutes: number;
+  tactics: string[];
+  strategy_source: string;
 };
 
 export type IdleAlert = {

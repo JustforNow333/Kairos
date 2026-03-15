@@ -236,6 +236,12 @@ const baseDashboard: DashboardResponse = {
     tradeoff_statement: "Compress the pset now, shift reading later, and the social window becomes cleanly claimable.",
     focus_boost_multiplier: 1.15,
     unlocked_minutes: 50,
+    tactics: [
+      "Compress Problem Set 4 into a sharp first-pass sprint so Sunset on the Slope stays reachable.",
+      "Push the reading block later and protect the cleanest pre-sunset stretch for visible progress.",
+      "Treat the next 25 minutes like a tactical unlock, not a full recovery session.",
+    ],
+    strategy_source: "rule-based",
   },
   idle_alert: {
     headline: "You can still make the slope if you move now.",

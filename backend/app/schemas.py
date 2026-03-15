@@ -99,6 +99,8 @@ class ShufflePlan(BaseModel):
     tradeoff_statement: str
     focus_boost_multiplier: float
     unlocked_minutes: int
+    tactics: list[str] = []
+    strategy_source: str = "rule-based"
 
 
 class IdleEvent(BaseModel):

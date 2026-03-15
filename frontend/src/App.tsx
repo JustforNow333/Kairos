@@ -4,7 +4,7 @@ import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { fetchDashboard, uploadSyllabus, putUserAssumptions, syncGoogleCalendar, getGoogleOAuthUrl, addFriend } from "./api";
-import type { DashboardResponse, ParseResponse, ScheduleBlock, SocialPocket, UserAssumptions } from "./types";
+import type { DashboardResponse, ParseResponse, ScheduleBlock } from "./types";
 
 type PageView = "home" | "schedule";
 
@@ -72,53 +72,6 @@ function toDateTimeLocal(value: string): string {
   const offset = date.getTimezoneOffset();
   const adjusted = new Date(date.getTime() - offset * 60_000);
   return adjusted.toISOString().slice(0, 16);
-}
-
-function buildFateweaverStrategies(
-  dashboard: DashboardResponse,
-  targetPocket: SocialPocket | null,
-  draftedBlock: TimeBlockDraft | null,
-): string[] {
-  const targetLabel = draftedBlock?.label || targetPocket?.title || "this window";
-  const strategies: string[] = [];
-  const sprintMinutes = Math.min(Math.max(Math.round(dashboard.shuffle_plan.unlocked_minutes / 2), 20), 30);
-
-  const readingAssignment = dashboard.assignments.find(
-    (assignment) => assignment.status !== "done" && assignment.task_type === "reading",
-  );
-  if (readingAssignment) {
-    strategies.push(
-      `Compress ${readingAssignment.title} into a discussion-only pass so ${targetLabel} stays claimable.`,
-    );
-  }
-
-  const problemSetAssignment = dashboard.assignments.find(
-    (assignment) =>
-      assignment.status !== "done" &&
-      (assignment.task_type === "pset" || assignment.task_type === "lab"),
-  );
-  if (problemSetAssignment) {
-    strategies.push(
-      `Front-load the fastest wins in ${problemSetAssignment.title} before you leave so the day still feels under control.`,
-    );
-  }
-
-  const laterWorkBlock = dashboard.shuffle_plan.after_blocks.find(
-    (block) => block.block_type === "work" && new Date(block.start_at).getHours() >= 19,
-  );
-  if (laterWorkBlock) {
-    strategies.push(
-      `Push ${laterWorkBlock.label} into the quieter late block and protect the cleanest hour for ${targetLabel}.`,
-    );
-  }
-
-  if (strategies.length < 3) {
-    strategies.push(
-      `Run a ${sprintMinutes}-minute distraction-free sprint now. Fateweaver Protocol only needs one clean burst to unlock ${targetLabel}.`,
-    );
-  }
-
-  return strategies.slice(0, 3);
 }
 
 function buildManagedClasses(dashboard: DashboardResponse): ManagedClass[] {
@@ -324,8 +277,8 @@ export default function App() {
       return [];
     }
 
-    return buildFateweaverStrategies(dashboard, topPocket, timeBlockDraft);
-  }, [dashboard, topPocket, timeBlockDraft]);
+    return dashboard.shuffle_plan.tactics ?? [];
+  }, [dashboard]);
 
   const selectedClass = managedClasses.find((course) => course.id === selectedClassId) ?? managedClasses[0] ?? null;
   const connectedFriends = dashboard?.friends.flatMap((friend) => friend.windows.map((window) => ({
