@@ -40,6 +40,184 @@ SCHEMA_SQLITE_PATH = Path(__file__).resolve().parent / "schema.sql"
 SCHEMA_POSTGRES_PATH = Path(__file__).resolve().parent / "schema_postgres.sql"
 DEMO_USER_ID = "demo-user"
 
+SCHEMA_SQLITE_FALLBACK = """
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT,
+    major TEXT NOT NULL,
+    reading_speed_pph INTEGER NOT NULL,
+    major_difficulty_multiplier REAL NOT NULL,
+    historical_productivity_multiplier REAL NOT NULL,
+    social_readiness_goal_hours REAL NOT NULL,
+    google_access_token TEXT,
+    google_refresh_token TEXT,
+    token_expiry DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS courses (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    syllabus_source TEXT
+);
+
+CREATE TABLE IF NOT EXISTS assignments (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    course_code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    task_type TEXT NOT NULL,
+    due_at TEXT NOT NULL,
+    base_effort_hours REAL NOT NULL,
+    estimated_weight INTEGER NOT NULL,
+    reading_pages INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending'
+);
+
+CREATE TABLE IF NOT EXISTS friends (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    friend_name TEXT NOT NULL,
+    home_zone TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS availability_windows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    friend_id TEXT NOT NULL,
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    location_hint TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS schedule_blocks (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    block_type TEXT NOT NULL,
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    movable INTEGER NOT NULL,
+    intensity REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS idle_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    app_name TEXT NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    detected_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS weather_context (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    summary TEXT NOT NULL,
+    condition TEXT NOT NULL,
+    temperature_f INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS opportunities (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    score REAL NOT NULL,
+    status TEXT NOT NULL
+);
+"""
+
+SCHEMA_POSTGRES_FALLBACK = """
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT,
+    major TEXT NOT NULL,
+    reading_speed_pph INTEGER NOT NULL,
+    major_difficulty_multiplier DOUBLE PRECISION NOT NULL,
+    historical_productivity_multiplier DOUBLE PRECISION NOT NULL,
+    social_readiness_goal_hours DOUBLE PRECISION NOT NULL,
+    google_access_token TEXT,
+    google_refresh_token TEXT,
+    token_expiry TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS courses (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    syllabus_source TEXT
+);
+
+CREATE TABLE IF NOT EXISTS assignments (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    course_code TEXT NOT NULL,
+    title TEXT NOT NULL,
+    task_type TEXT NOT NULL,
+    due_at TEXT NOT NULL,
+    base_effort_hours DOUBLE PRECISION NOT NULL,
+    estimated_weight INTEGER NOT NULL,
+    reading_pages INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending'
+);
+
+CREATE TABLE IF NOT EXISTS friends (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    friend_name TEXT NOT NULL,
+    home_zone TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS availability_windows (
+    id BIGSERIAL PRIMARY KEY,
+    friend_id TEXT NOT NULL,
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    location_hint TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS schedule_blocks (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    block_type TEXT NOT NULL,
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    movable BOOLEAN NOT NULL,
+    intensity DOUBLE PRECISION NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS idle_events (
+    id BIGSERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    app_name TEXT NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    detected_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS weather_context (
+    id INTEGER PRIMARY KEY,
+    summary TEXT NOT NULL,
+    condition TEXT NOT NULL,
+    temperature_f INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS opportunities (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    score DOUBLE PRECISION NOT NULL,
+    status TEXT NOT NULL
+);
+"""
+
 
 def resolve_db_path() -> Path:
     configured_path = os.getenv("KAIROS_DB_PATH")
@@ -96,6 +274,17 @@ def using_postgres() -> bool:
     return bool(settings.DATABASE_URL)
 
 
+def get_schema_text() -> str:
+    if using_postgres():
+        if SCHEMA_POSTGRES_PATH.exists():
+            return SCHEMA_POSTGRES_PATH.read_text()
+        return SCHEMA_POSTGRES_FALLBACK
+
+    if SCHEMA_SQLITE_PATH.exists():
+        return SCHEMA_SQLITE_PATH.read_text()
+    return SCHEMA_SQLITE_FALLBACK
+
+
 def get_connection() -> ConnectionAdapter:
     if using_postgres():
         if psycopg is None:
@@ -108,9 +297,8 @@ def get_connection() -> ConnectionAdapter:
 
 
 def initialize_database() -> None:
-    schema_path = SCHEMA_POSTGRES_PATH if using_postgres() else SCHEMA_SQLITE_PATH
     with get_connection() as connection:
-        connection.executescript(schema_path.read_text())
+        connection.executescript(get_schema_text())
 
         try:
             connection.execute("ALTER TABLE users ADD COLUMN google_access_token TEXT")
