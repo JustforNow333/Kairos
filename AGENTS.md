@@ -65,12 +65,23 @@ python3 -m compileall backend/app
 cd frontend && npm run build
 ```
 
+### Vercel deployment
+
+- Deploy the frontend and backend as two separate Vercel projects from the same repo.
+- Set the frontend Root Directory to `frontend`.
+- Set the backend Root Directory to `backend`.
+- The backend Vercel entrypoint is `backend/index.py`.
+- The frontend should use `NEXT_PUBLIC_API_BASE_URL` to point at the deployed backend URL.
+- The backend should use `API_ALLOWED_ORIGINS` for the deployed frontend URL and may use `API_ALLOWED_ORIGIN_REGEX` for preview deployments.
+- The backend demo SQLite store runs from `/tmp/kairos.db` on Vercel. This is acceptable for demos, but uploaded syllabus state is ephemeral across cold starts and redeploys.
+
 ### Environment safety
 
 - Keep the backend virtualenv at the repo root as `venv/`, or otherwise outside the watched `backend/` tree.
 - Keep `--reload-dir backend/app` on the backend dev server so Uvicorn only watches source files, not the environment.
 - Do not run `npm install` from WSL and then try to use the resulting `node_modules` from PowerShell. Reinstall in the shell you plan to use.
 - This repo is not a root-level Node workspace. Do not create a root `package-lock.json`.
+- Do not rely on Vercel-hosted SQLite state for anything beyond the live demo. If persistent state matters, move the backend to a real external database.
 
 ## Backend conventions
 

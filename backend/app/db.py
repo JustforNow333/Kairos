@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from tempfile import gettempdir
 
 from .config import settings
 from .mock_data import (
@@ -34,10 +36,24 @@ except ImportError:  # pragma: no cover
     dict_row = None
 
 
-DB_PATH = Path(__file__).resolve().parent.parent / "kairos.db"
 SCHEMA_SQLITE_PATH = Path(__file__).resolve().parent / "schema.sql"
 SCHEMA_POSTGRES_PATH = Path(__file__).resolve().parent / "schema_postgres.sql"
 DEMO_USER_ID = "demo-user"
+
+
+def resolve_db_path() -> Path:
+    configured_path = os.getenv("KAIROS_DB_PATH")
+    if configured_path:
+        return Path(configured_path)
+
+    # Vercel Functions expose a read-only project filesystem with writable /tmp scratch space.
+    if os.getenv("VERCEL"):
+        return Path(gettempdir()) / "kairos.db"
+
+    return Path(__file__).resolve().parent.parent / "kairos.db"
+
+
+DB_PATH = resolve_db_path()
 
 
 class ConnectionAdapter:
@@ -86,7 +102,6 @@ def get_connection() -> ConnectionAdapter:
             raise RuntimeError("psycopg is required when DATABASE_URL is set")
         connection = psycopg.connect(settings.DATABASE_URL, row_factory=dict_row)
         return ConnectionAdapter(connection, "postgres")
-
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     return ConnectionAdapter(connection, "sqlite")

@@ -56,6 +56,38 @@ python -m compileall backend/app
 cd frontend && npm run build
 ```
 
+## Vercel Deployment
+
+Deploy this repo to Vercel as two separate projects from the same Git repository.
+
+### Frontend project
+
+- Root Directory: `frontend`
+- Framework Preset: `Next.js`
+- Build Command: default
+- Output Directory: default
+- Environment variables:
+  - `NEXT_PUBLIC_API_BASE_URL=https://your-backend-project.vercel.app`
+
+### Backend project
+
+- Root Directory: `backend`
+- Framework Preset: Python / `Other`
+- Entry file: `backend/index.py`
+- Install Command: default, or `pip install -r requirements.txt`
+- Environment variables:
+  - `API_ALLOWED_ORIGINS=https://your-frontend-project.vercel.app`
+  - `API_ALLOWED_ORIGIN_REGEX=https://.*\\.vercel\\.app`
+  - Optional: `KAIROS_DB_PATH=/tmp/kairos.db`
+
+### Backend deployment notes
+
+- The backend now exposes a Vercel entrypoint at `backend/index.py`.
+- After the backend project deploys, copy its production URL from Vercel and use that exact value for `NEXT_PUBLIC_API_BASE_URL` in the frontend project.
+- On Vercel, the SQLite demo database automatically moves to `/tmp/kairos.db` because the deployed project files are read-only.
+- `/tmp` is ephemeral. Uploaded syllabus changes are not durable across cold starts or redeploys. For persistent production data, move the backend off local SQLite and onto Postgres or another external database.
+- The backend includes `backend/vercel.json` so `app/schema.sql` is bundled with the function deployment.
+
 ## Environment Notes
 
 - The root `requirements.txt` installs the backend Python dependencies so you can run the API from the project root.

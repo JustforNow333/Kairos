@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
 from fastapi import FastAPI, UploadFile, File, Request
@@ -42,10 +43,22 @@ app = FastAPI(title="KAIROS Engine", version="0.1.0")
 # Add SessionMiddleware (required by authlib for state verification)
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 
+
+def parse_allowed_origins() -> list[str]:
+    raw_origins = os.getenv("API_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+    origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+    return origins or ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
+ALLOWED_ORIGINS = parse_allowed_origins()
+ALLOWED_ORIGIN_REGEX = os.getenv("API_ALLOWED_ORIGIN_REGEX")
+ALLOW_CREDENTIALS = "*" not in ALLOWED_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
+    allow_credentials=ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

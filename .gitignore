@@ -28,6 +28,9 @@ frontend/.vercel/
 /package-lock.json
 node_modules/
 frontend/node_modules/
+.vercel/
+backend/.vercel/
+frontend/.vercel/
 .next/
 dist/
 out/
@@ -52,5 +55,6 @@ backend/kairos.db
 *.db
 *.log
 .tmp/
+vercel-debug.log*
 tmp/
 temp/
