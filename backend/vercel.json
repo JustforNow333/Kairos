@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "index.py": {
+    "api/index.py": {
       "includeFiles": "app/schema.sql",
       "maxDuration": 30
     }
