@@ -75,7 +75,7 @@ Do not use a root-level `vercel.json` or deploy the repository root as a single 
 
 - Root Directory: `backend`
 - Framework Preset: Python / `Other`
-- Entry file: `backend/api/index.py`
+- Entry file: `backend/index.py`
 - Install Command: default, or `pip install -r requirements.txt`
 - Environment variables:
   - `API_ALLOWED_ORIGINS=https://your-frontend-project.vercel.app`
@@ -84,7 +84,7 @@ Do not use a root-level `vercel.json` or deploy the repository root as a single 
 
 ### Backend deployment notes
 
-- The backend now exposes a Vercel entrypoint at `backend/api/index.py`.
+- The backend now exposes a Vercel entrypoint at `backend/index.py`.
 - After the backend project deploys, copy its production URL from Vercel and use that exact value for `NEXT_PUBLIC_API_BASE_URL` in the frontend project.
 - On Vercel, the SQLite demo database automatically moves to `/tmp/kairos.db` because the deployed project files are read-only.
 - `/tmp` is ephemeral. Uploaded syllabus changes are not durable across cold starts or redeploys. For persistent production data, move the backend off local SQLite and onto Postgres or another external database.
